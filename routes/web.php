@@ -29,4 +29,7 @@ Route::middleware('auth')->group(function () {
     });
 });
 
+Route::get('/{code}', [LinkController::class, 'redirectToOriginal']);
+
+
 require __DIR__ . '/auth.php';
