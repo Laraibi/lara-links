@@ -27,6 +27,8 @@ Route::middleware('auth')->group(function () {
 
     Route::controller(LinkController::class)->prefix("/links")->group(function () {
         Route::post('/', "store");
+        Route::get('/', "dashboardLinks");
+        Route::get('/stats/{link}', "linkStats")->name('link.stats');
     });
 });
 

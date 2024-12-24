@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User;
+use App\Models\Visit;
 
 class link extends Model
 {
@@ -16,6 +17,11 @@ class link extends Model
         return $this->belongsTo(User::class);
     }
 
+
+    public function visits()
+    {
+        return $this->hasMany(Visit::class);
+    }
     protected static function generateUniqueCode()
     {
         $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';

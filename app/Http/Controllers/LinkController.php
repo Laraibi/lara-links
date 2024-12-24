@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\Visit;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
 
 class LinkController extends Controller
 {
@@ -88,5 +89,52 @@ class LinkController extends Controller
             Log::alert($e->getMessage());
         }
         return [];
+    }
+
+    // Fetch links added by the logged-in user
+    public function dashboardLinks()
+    {
+        $links = Link::where('user_id', Auth::user()->id)
+            ->withCount('visits') // Count visits for each link
+            ->get();
+
+        return response()->json($links);
+    }
+
+    public function linkStats(Link $link)
+    {
+        // Aggregate visit stats
+        $visitsByDate = Visit::selectRaw('DATE(visited_at) as date, COUNT(*) as total')
+            ->where('link_id', $link->id)
+            ->groupBy('date')
+            ->orderBy('date', 'asc')
+            ->get();
+
+        $visitsByCountry = Visit::selectRaw('country, COUNT(*) as total')
+            ->where('link_id', $link->id)
+            ->groupBy('country')
+            ->orderByDesc('total')
+            ->get();
+
+        $visitsByCity = Visit::selectRaw('city, COUNT(*) as total')
+            ->where('link_id', $link->id)
+            ->groupBy('city')
+            ->orderByDesc('total')
+            ->get();
+
+        $visitsByLanguage = Visit::selectRaw('language, COUNT(*) as total')
+            ->where('link_id', $link->id)
+            ->groupBy('language')
+            ->orderByDesc('total')
+            ->get();
+
+
+        return Inertia::render('Stats', [
+            'id' => $link->id,
+            'visits_by_date' => $visitsByDate,
+            'visits_by_country' => $visitsByCountry,
+            'visits_by_city' => $visitsByCity,
+            'visits_by_language' => $visitsByLanguage,
+        ]);
     }
 }

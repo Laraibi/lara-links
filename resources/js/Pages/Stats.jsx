@@ -1,26 +1,31 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head } from "@inertiajs/react";
-import CreateLinkForm from "@/Components/CreateLinkForm";
-import DashboardLinks from "@/Components/DashboardLinks";
+import LinkStats from "@/Components/LinksStats";
 
-export default function Dashboard() {
+export default function Stats({
+    visits_by_date,
+    visits_by_country,
+    visits_by_city,
+    visits_by_language,
+}) {
+    const stats = {
+        visits_by_date,
+        visits_by_country,
+        visits_by_city,
+        visits_by_language,
+    };
     return (
         <AuthenticatedLayout
             header={
                 <h2 className="text-xl font-semibold leading-tight text-gray-800">
-                    Dashboard
+                    Stats
                 </h2>
             }
         >
             <Head title="Dashboard" />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                    <CreateLinkForm />
-                </div>
-            </div>
             <div className="container mx-auto">
-                <DashboardLinks />
+                <LinkStats stats={stats} />
             </div>
         </AuthenticatedLayout>
     );
