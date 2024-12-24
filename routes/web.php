@@ -7,12 +7,13 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
+    // return Inertia::render('Welcome', [
+    //     'canLogin' => Route::has('login'),
+    //     'canRegister' => Route::has('register'),
+    //     'laravelVersion' => Application::VERSION,
+    //     'phpVersion' => PHP_VERSION,
+    // ]);
+    return redirect("/login");
 });
 
 Route::get('/dashboard', function () {
@@ -29,7 +30,8 @@ Route::middleware('auth')->group(function () {
     });
 });
 
-Route::get('/{code}', [LinkController::class, 'redirectToOriginal']);
 
 
 require __DIR__ . '/auth.php';
+Route::get('/{code}', [LinkController::class, 'redirectToOriginal'])
+    ->where('code', '^[0-9a-zA-Z]{6}$');
