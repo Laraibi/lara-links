@@ -233,6 +233,10 @@ export default function DashboardLinks({ initialLinks = [] }) {
                                     <div className="mt-3 text-xs text-gray-500">
                                         Created: {new Date(link.created_at).toLocaleDateString()}
                                     </div>
+                                    <div className="mt-2 flex items-center text-xs text-gray-500">
+                                        <FaChartLine className="mr-1 h-3 w-3" />
+                                        {link.visits_count || 0} visits
+                                    </div>
                                 </div>
                             </motion.div>
                         ))}

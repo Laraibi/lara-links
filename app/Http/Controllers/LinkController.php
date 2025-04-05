@@ -127,12 +127,14 @@ class LinkController extends Controller
             ->selectRaw('country, COUNT(*) as count')
             ->whereNotNull('country')
             ->groupBy('country')
+            ->orderByDesc('count')
             ->get();
             
         // Get visit counts by device type (simplified)
         $deviceStats = $link->visits()
             ->selectRaw('device, COUNT(*) as count')
             ->groupBy('device')
+            ->orderByDesc('count')
             ->get();
             
         // Get visit counts by day (last 30 days)
