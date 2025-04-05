@@ -5,6 +5,8 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Models\Link;
+use Illuminate\Support\Facades\Auth;
 
 Route::get('/', function () {
     // return Inertia::render('Welcome', [
@@ -17,7 +19,13 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
+    $links = Link::where('user_id', Auth::id())
+        ->withCount('visits')
+        ->get();
+        
+    return Inertia::render('Dashboard', [
+        'links' => $links
+    ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
@@ -29,6 +37,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/', "store");
         Route::get('/', "dashboardLinks");
         Route::get('/stats/{link}', "linkStats")->name('link.stats');
+        Route::delete('/{link}', "destroy");
+        Route::put('/{link}', "update");
     });
 });
 

@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\link;
+use App\Models\Link;
 
 class Visit extends Model
 {
@@ -20,6 +20,6 @@ class Visit extends Model
 
     public function link()
     {
-        return $this->belongsTo(link::class);
+        return $this->belongsTo(Link::class);
     }
 }

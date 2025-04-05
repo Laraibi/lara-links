@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\link;
+use App\Models\Link;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Visit;
 use Illuminate\Support\Facades\Http;
@@ -18,38 +18,41 @@ class LinkController extends Controller
     {
         $request->validate([
             'url' => 'required|url|max:2048',
+            'name' => 'nullable|string|max:255',
         ]);
 
         try {
-            $link = link::create([
+            $link = Link::create([
                 'original' => $request->url,
+                'name' => $request->name,
                 'user_id' => Auth::id(),
-                'code' => link::generateUniqueCode(), // Extracted logic
+                'code' => Link::generateUniqueCode(),
             ]);
 
-            return response()->json([
+            // Get all links for the user to update the dashboard
+            $links = Link::where('user_id', Auth::id())
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            // Return a redirect with flash data for Inertia
+            return redirect()->back()->with([
                 'success' => true,
                 'message' => 'Link shortened successfully!',
-                'data' => [
-                    'id' => $link->id,
-                    'original_url' => $link->original,
-                    'short_url' => url("/{$link->code}"),
-                    'created_at' => $link->created_at,
-                ],
-            ], 201);
+                'short_url' => url($link->code),
+                'new_link' => $link->toArray(),
+                'links' => $links
+            ]);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'An error occurred.',
-                'error' => config('app.debug') ? $e->getMessage() : null,
-            ], 500);
+            return redirect()->back()->with([
+                'error' => 'An error occurred while shortening the link.',
+            ]);
         }
     }
 
     public function redirectToOriginal($code, Request $request)
     {
         // Find the link by code
-        $link = link::where('code', $code)->firstOrFail();
+        $link = Link::where('code', $code)->firstOrFail();
 
         // Collect visitor data
         $device = $request->header('User-Agent');
@@ -98,43 +101,107 @@ class LinkController extends Controller
             ->withCount('visits') // Count visits for each link
             ->get();
 
-        return response()->json($links);
+        // Check if the request expects JSON (API request)
+        if (request()->expectsJson()) {
+            return response()->json($links);
+        }
+
+        // Otherwise, return an Inertia response
+        return Inertia::render('DashboardLinks', [
+            'links' => $links
+        ]);
     }
 
     public function linkStats(Link $link)
     {
-        // Aggregate visit stats
-        $visitsByDate = Visit::selectRaw('DATE(visited_at) as date, COUNT(*) as total')
-            ->where('link_id', $link->id)
-            ->groupBy('date')
-            ->orderBy('date', 'asc')
-            ->get();
+        // Check if the user is authorized to view this link's stats
+        if ($link->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized action.');
+        }
 
-        $visitsByCountry = Visit::selectRaw('country, COUNT(*) as total')
-            ->where('link_id', $link->id)
+        // Get visit statistics
+        $visits = $link->visits()->orderBy('visited_at', 'desc')->get();
+        
+        // Get visit counts by country
+        $countryStats = $link->visits()
+            ->selectRaw('country, COUNT(*) as count')
+            ->whereNotNull('country')
             ->groupBy('country')
-            ->orderByDesc('total')
             ->get();
-
-        $visitsByCity = Visit::selectRaw('city, COUNT(*) as total')
-            ->where('link_id', $link->id)
-            ->groupBy('city')
-            ->orderByDesc('total')
+            
+        // Get visit counts by device type (simplified)
+        $deviceStats = $link->visits()
+            ->selectRaw('device, COUNT(*) as count')
+            ->groupBy('device')
             ->get();
-
-        $visitsByLanguage = Visit::selectRaw('language, COUNT(*) as total')
-            ->where('link_id', $link->id)
-            ->groupBy('language')
-            ->orderByDesc('total')
+            
+        // Get visit counts by day (last 30 days)
+        $dailyStats = $link->visits()
+            ->selectRaw('DATE(visited_at) as date, COUNT(*) as count')
+            ->where('visited_at', '>=', now()->subDays(30))
+            ->groupBy('date')
+            ->orderBy('date')
             ->get();
-
 
         return Inertia::render('Stats', [
-            'id' => $link->id,
-            'visits_by_date' => $visitsByDate,
-            'visits_by_country' => $visitsByCountry,
-            'visits_by_city' => $visitsByCity,
-            'visits_by_language' => $visitsByLanguage,
+            'link' => $link,
+            'visits' => $visits,
+            'countryStats' => $countryStats,
+            'deviceStats' => $deviceStats,
+            'dailyStats' => $dailyStats,
         ]);
+    }
+
+    public function destroy(Link $link)
+    {
+        // Check if the user is authorized to delete this link
+        if ($link->user_id !== Auth::id()) {
+            return redirect()->back()->with([
+                'error' => 'You are not authorized to delete this link.',
+            ]);
+        }
+
+        try {
+            $link->delete();
+            
+            return redirect()->back()->with([
+                'success' => true,
+                'message' => 'Link deleted successfully!',
+            ]);
+        } catch (\Exception $e) {
+            return redirect()->back()->with([
+                'error' => 'An error occurred while deleting the link.',
+            ]);
+        }
+    }
+
+    public function update(Request $request, Link $link)
+    {
+        // Check if the user is authorized to update this link
+        if ($link->user_id !== Auth::id()) {
+            return redirect()->back()->with([
+                'error' => 'You are not authorized to update this link.',
+            ]);
+        }
+
+        try {
+            $request->validate([
+                'name' => 'nullable|string|max:255',
+            ]);
+
+            $link->update([
+                'name' => $request->name,
+            ]);
+            
+            return redirect()->back()->with([
+                'success' => true,
+                'message' => 'Link updated successfully!',
+                'updated_link' => $link->toArray(),
+            ]);
+        } catch (\Exception $e) {
+            return redirect()->back()->with([
+                'error' => 'An error occurred while updating the link.',
+            ]);
+        }
     }
 }

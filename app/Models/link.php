@@ -6,22 +6,25 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User;
 use App\Models\Visit;
 
-class link extends Model
+class Link extends Model
 {
-    //
-    protected $fillable = ["user_id", 'original', 'code'];
-
+    protected $fillable = [
+        'user_id',
+        'original',
+        'code',
+        'name',
+    ];
 
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-
     public function visits()
     {
         return $this->hasMany(Visit::class);
     }
+
     protected static function generateUniqueCode()
     {
         $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -43,4 +46,4 @@ class link extends Model
 
         return $code;
     }
-}
+} 
