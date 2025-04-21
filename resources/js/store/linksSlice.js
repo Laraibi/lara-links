@@ -11,30 +11,20 @@ const linksSlice = createSlice({
     initialState,
     reducers: {
         setLinks: (state, action) => {
-            // Ensure we're working with an array
-            if (Array.isArray(action.payload)) {
-                state.links = action.payload;
-            }
-        },
-        addLink: (state, action) => {
-            // Check if the link has all required properties
-            if (action.payload && action.payload.id && action.payload.code) {
-                // Check if the link already exists to avoid duplicates
-                const linkExists = state.links.some(link => link.id === action.payload.id);
-                if (!linkExists) {
-                    state.links.unshift(action.payload);
-                }
-            }
+            state.links = action.payload;
         },
         updateLink: (state, action) => {
-            // Find the link by ID and update it
-            const index = state.links.findIndex(link => link.id === action.payload.id);
-            if (index !== -1) {
-                state.links[index] = { ...state.links[index], ...action.payload };
+            const { id, name } = action.payload;
+            const link = state.links.find(link => link.id === id);
+            if (link) {
+                link.name = name;
             }
         },
-        removeLink: (state, action) => {
+        deleteLink: (state, action) => {
             state.links = state.links.filter(link => link.id !== action.payload);
+        },
+        addLink: (state, action) => {
+            state.links.push(action.payload);
         },
         setLoading: (state, action) => {
             state.loading = action.payload;
@@ -45,6 +35,6 @@ const linksSlice = createSlice({
     },
 });
 
-export const { setLinks, addLink, updateLink, removeLink, setLoading, setError } = linksSlice.actions;
+export const { setLinks, updateLink, deleteLink, addLink, setLoading, setError } = linksSlice.actions;
 
 export default linksSlice.reducer; 

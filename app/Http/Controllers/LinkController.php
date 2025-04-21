@@ -9,9 +9,21 @@ use App\Models\Visit;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use App\Services\AnalyticsService;
+use App\Services\AnalyticsExportService;
+use Illuminate\Support\Facades\Storage;
 
 class LinkController extends Controller
 {
+    protected $analyticsService;
+    protected $exportService;
+
+    public function __construct(AnalyticsService $analyticsService, AnalyticsExportService $exportService)
+    {
+        $this->analyticsService = $analyticsService;
+        $this->exportService = $exportService;
+    }
+
     //
 
     public function store(Request $request)
@@ -54,25 +66,8 @@ class LinkController extends Controller
         // Find the link by code
         $link = Link::where('code', $code)->firstOrFail();
 
-        // Collect visitor data
-        $device = $request->header('User-Agent');
-        $language = $request->getPreferredLanguage();
-        $timestamp = now();
-        $ip = $request->ip();
-
-        // Get geolocation using an external API (e.g., ipstack or GeoIP)
-        $geoData = $this->getGeoData($ip);
-
-        // Log the visit
-        Visit::create([
-            'link_id' => $link->id,
-            'device' => $device,
-            'language' => $language,
-            'visited_at' => $timestamp,
-            'country' => $geoData['country'] ?? null,
-            'city' => $geoData['city'] ?? null,
-            'ip' => $ip
-        ]);
+        // Record the visit using our analytics service
+        $visit = $this->analyticsService->recordVisit($request, $link->id);
 
         // Redirect to the original URL
         return redirect()->to($link->original);
@@ -119,7 +114,7 @@ class LinkController extends Controller
             abort(403, 'Unauthorized action.');
         }
 
-        // Get visit statistics
+        // Get visit statistics with enhanced data
         $visits = $link->visits()->orderBy('visited_at', 'desc')->get();
         
         // Get visit counts by country
@@ -130,10 +125,24 @@ class LinkController extends Controller
             ->orderByDesc('count')
             ->get();
             
-        // Get visit counts by device type (simplified)
+        // Get visit counts by device type
         $deviceStats = $link->visits()
-            ->selectRaw('device, COUNT(*) as count')
-            ->groupBy('device')
+            ->selectRaw('device_type, COUNT(*) as count')
+            ->groupBy('device_type')
+            ->orderByDesc('count')
+            ->get();
+
+        // Get visit counts by browser
+        $browserStats = $link->visits()
+            ->selectRaw('browser, COUNT(*) as count')
+            ->groupBy('browser')
+            ->orderByDesc('count')
+            ->get();
+
+        // Get visit counts by platform
+        $platformStats = $link->visits()
+            ->selectRaw('platform, COUNT(*) as count')
+            ->groupBy('platform')
             ->orderByDesc('count')
             ->get();
             
@@ -145,12 +154,20 @@ class LinkController extends Controller
             ->orderBy('date')
             ->get();
 
+        // Get average time spent
+        $avgTimeSpent = $link->visits()
+            ->whereNotNull('time_spent')
+            ->avg('time_spent');
+
         return Inertia::render('Stats', [
             'link' => $link,
             'visits' => $visits,
             'countryStats' => $countryStats,
             'deviceStats' => $deviceStats,
+            'browserStats' => $browserStats,
+            'platformStats' => $platformStats,
             'dailyStats' => $dailyStats,
+            'avgTimeSpent' => round($avgTimeSpent ?? 0, 2),
         ]);
     }
 
@@ -179,31 +196,190 @@ class LinkController extends Controller
 
     public function update(Request $request, Link $link)
     {
+        Log::info('Link update request received', [
+            'link_id' => $link->id,
+            'user_id' => Auth::id(),
+            'request_data' => $request->all()
+        ]);
+        
         // Check if the user is authorized to update this link
         if ($link->user_id !== Auth::id()) {
-            return redirect()->back()->with([
-                'error' => 'You are not authorized to update this link.',
+            Log::warning('Unauthorized link update attempt', [
+                'link_id' => $link->id,
+                'user_id' => Auth::id()
             ]);
+            
+            return back()->with('error', 'You are not authorized to update this link.');
         }
 
         try {
+            // Allow null or non-empty string for name
             $request->validate([
                 'name' => 'nullable|string|max:255',
             ]);
 
+            Log::info('Updating link name', [
+                'link_id' => $link->id,
+                'old_name' => $link->name,
+                'new_name' => $request->input('name')
+            ]);
+
+            // Update the link name, converting empty string to null
             $link->update([
-                'name' => $request->name,
+                'name' => $request->input('name') ?: null,
             ]);
             
-            return redirect()->back()->with([
+            // Refresh the link to get the updated data
+            $link->refresh();
+            
+            Log::info('Link updated successfully', [
+                'link_id' => $link->id,
+                'updated_name' => $link->name
+            ]);
+            
+            // Return an Inertia response with flash data
+            return back()->with([
                 'success' => true,
-                'message' => 'Link updated successfully!',
-                'updated_link' => $link->toArray(),
+                'message' => 'Link name updated successfully!',
+                'updated_link' => $link->toArray()
             ]);
         } catch (\Exception $e) {
-            return redirect()->back()->with([
-                'error' => 'An error occurred while updating the link.',
+            Log::error('Error updating link', [
+                'link_id' => $link->id,
+                'error' => $e->getMessage()
             ]);
+            
+            return back()->with('error', 'An error occurred while updating the link.');
         }
+    }
+
+    public function exportAnalytics(Link $link, Request $request)
+    {
+        Log::info("Export request received for link ID: {$link->id}, format: {$request->input('format')}, type: {$request->input('type')}");
+        
+        // Check if the user is authorized to export this link's stats
+        if ($link->user_id !== Auth::id()) {
+            Log::warning("Unauthorized export attempt for link ID: {$link->id} by user ID: " . Auth::id());
+            abort(403, 'Unauthorized action.');
+        }
+
+        $format = $request->input('format', 'csv');
+        $type = $request->input('type', 'visits');
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+        
+        Log::info("Processing export for link ID: {$link->id}, format: {$format}, type: {$type}, date range: {$startDate} to {$endDate}");
+
+        try {
+            switch ($format) {
+                case 'csv':
+                    Log::info("Calling exportToCsv for link ID: {$link->id}, type: {$type}");
+                    $filename = $this->exportService->exportToCsv($link, $type, $startDate, $endDate);
+                    break;
+                case 'excel':
+                case 'xlsx':
+                    Log::info("Calling exportToExcel for link ID: {$link->id}");
+                    $filename = $this->exportService->exportToExcel($link, $startDate, $endDate);
+                    break;
+                default:
+                    abort(400, 'Invalid export format');
+            }
+            
+            Log::info("Export successful, returning file: {$filename}");
+            return response()->download(storage_path("app/exports/{$filename}"))->deleteFileAfterSend();
+        } catch (\Exception $e) {
+            Log::error("Export failed for link ID: {$link->id}, error: " . $e->getMessage());
+            Log::error($e->getTraceAsString());
+            abort(500, 'Failed to generate export file');
+        }
+    }
+
+    public function getAnalyticsReport(Link $link)
+    {
+        // Check if the user is authorized to view this link's stats
+        if ($link->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        try {
+            $report = $this->exportService->generateReport($link);
+            return response()->json($report);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to generate report'], 500);
+        }
+    }
+
+    public function filterAnalytics(Link $link, Request $request)
+    {
+        // Check if the user is authorized to view this link's stats
+        if ($link->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $startDate = $request->input('startDate');
+        $endDate = $request->input('endDate');
+
+        // Base query for visits within the date range
+        $visitsQuery = $link->visits()
+            ->when($startDate, function ($query) use ($startDate) {
+                return $query->whereDate('visited_at', '>=', $startDate);
+            })
+            ->when($endDate, function ($query) use ($endDate) {
+                return $query->whereDate('visited_at', '<=', $endDate);
+            });
+
+        // Get filtered visits
+        $visits = (clone $visitsQuery)->orderBy('visited_at', 'desc')->get();
+        
+        // Get filtered country stats
+        $countryStats = (clone $visitsQuery)
+            ->selectRaw('country, COUNT(*) as count')
+            ->whereNotNull('country')
+            ->groupBy('country')
+            ->orderByDesc('count')
+            ->get();
+            
+        // Get filtered device stats
+        $deviceStats = (clone $visitsQuery)
+            ->selectRaw('device_type, COUNT(*) as count')
+            ->groupBy('device_type')
+            ->orderByDesc('count')
+            ->get();
+
+        // Get filtered browser stats
+        $browserStats = (clone $visitsQuery)
+            ->selectRaw('browser, COUNT(*) as count')
+            ->groupBy('browser')
+            ->orderByDesc('count')
+            ->get();
+
+        // Get filtered platform stats
+        $platformStats = (clone $visitsQuery)
+            ->selectRaw('platform, COUNT(*) as count')
+            ->groupBy('platform')
+            ->orderByDesc('count')
+            ->get();
+            
+        // Get filtered daily stats
+        $dailyStats = (clone $visitsQuery)
+            ->selectRaw('DATE(visited_at) as date, COUNT(*) as count')
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get();
+
+        // Get filtered average time spent
+        $avgTimeSpent = (clone $visitsQuery)
+            ->whereNotNull('time_spent')
+            ->avg('time_spent');
+
+        return response()->json([
+            'visits' => $visits,
+            'countryStats' => $countryStats,
+            'deviceStats' => $deviceStats,
+            'browserStats' => $browserStats,
+            'platformStats' => $platformStats,
+            'dailyStats' => $dailyStats,
+            'avgTimeSpent' => round($avgTimeSpent ?? 0, 2),
+        ]);
     }
 }

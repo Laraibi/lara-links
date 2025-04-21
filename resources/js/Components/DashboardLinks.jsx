@@ -15,6 +15,7 @@ export default function DashboardLinks({ initialLinks = [] }) {
     const [currentPage, setCurrentPage] = useState(1);
     const [editingLinkId, setEditingLinkId] = useState(null);
     const [editingName, setEditingName] = useState("");
+    const [pendingUpdates, setPendingUpdates] = useState({});
     const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, linkId: null, linkName: null });
     const linksPerPage = 6;
     const { props } = usePage();
@@ -86,24 +87,68 @@ export default function DashboardLinks({ initialLinks = [] }) {
         setEditingName(link.name || "");
     };
 
+    const handleNameChange = (e) => {
+        setEditingName(e.target.value);
+    };
+
     const saveEdit = (linkId) => {
-        if (editingName.trim() !== "") {
-            router.put(`/links/${linkId}`, { name: editingName }, {
+        const currentName = editingName.trim();
+        if (currentName !== "") {
+            // Store the current name and link ID
+            const nameToSave = currentName;
+            
+            // Reset editing state
+            setEditingLinkId(null);
+            setEditingName("");
+            
+            // Create a unique key for this update
+            const updateKey = `${linkId}-${Date.now()}`;
+            
+            // Store this update in pending updates
+            setPendingUpdates(prev => ({
+                ...prev,
+                [updateKey]: { linkId, name: nameToSave }
+            }));
+            
+            // Send the request to the server
+            router.put(`/links/${linkId}`, { 
+                name: nameToSave
+            }, {
                 preserveScroll: true,
                 onSuccess: (page) => {
-                    // Update the link in Redux store
-                    const updatedLink = { ...links.find(link => link.id === linkId), name: editingName };
+                    // Update Redux store with the new name
+                    const updatedLink = { ...links.find(link => link.id === linkId), name: nameToSave };
                     dispatch(updateLink(updatedLink));
-                    setEditingLinkId(null);
+                    
+                    // Remove this update from pending updates
+                    setPendingUpdates(prev => {
+                        const newUpdates = { ...prev };
+                        delete newUpdates[updateKey];
+                        return newUpdates;
+                    });
                 },
+                onError: () => {
+                    // If the server update fails, revert the Redux store
+                    const originalLink = links.find(link => link.id === linkId);
+                    dispatch(updateLink(originalLink));
+                    
+                    // Remove this update from pending updates
+                    setPendingUpdates(prev => {
+                        const newUpdates = { ...prev };
+                        delete newUpdates[updateKey];
+                        return newUpdates;
+                    });
+                }
             });
         } else {
             setEditingLinkId(null);
+            setEditingName("");
         }
     };
 
     const cancelEdit = () => {
         setEditingLinkId(null);
+        setEditingName("");
     };
 
     return (
@@ -142,7 +187,7 @@ export default function DashboardLinks({ initialLinks = [] }) {
                                                     <input
                                                         type="text"
                                                         value={editingName}
-                                                        onChange={(e) => setEditingName(e.target.value)}
+                                                        onChange={handleNameChange}
                                                         placeholder="Enter link name"
                                                         className="w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md text-sm"
                                                         autoFocus

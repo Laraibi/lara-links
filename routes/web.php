@@ -34,15 +34,16 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::controller(LinkController::class)->prefix("/links")->group(function () {
-        Route::post('/', "store");
-        Route::get('/', "dashboardLinks");
+        Route::post('/', "store")->name('links.store');
+        // Route::get('/', "dashboardLinks"); // Temporarily disabled to avoid conflicts with LinksCard
         Route::get('/stats/{link}', "linkStats")->name('link.stats');
-        Route::delete('/{link}', "destroy");
-        Route::put('/{link}', "update");
+        Route::get('/stats/{link}/export', "exportAnalytics")->name('link.export');
+        Route::get('/stats/{link}/report', "getAnalyticsReport")->name('link.report');
+        Route::get('/stats/{link}/filter', "filterAnalytics")->name('link.filter');
+        Route::delete('/{link}', "destroy")->name('links.destroy');
+        Route::put('/{link}', "update")->name('links.update');
     });
 });
-
-
 
 require __DIR__ . '/auth.php';
 Route::get('/{code}', [LinkController::class, 'redirectToOriginal'])
