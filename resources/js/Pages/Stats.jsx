@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Head } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { FaArrowLeft, FaChartLine, FaGlobe, FaMobile, FaCalendarAlt, FaExternalLinkAlt, FaCopy, FaCheck } from 'react-icons/fa';
+import { FaArrowLeft, FaChartLine, FaGlobe, FaMobile, FaCalendarAlt, FaExternalLinkAlt, FaCopy, FaCheck, FaClock, FaDownload, FaFileExport, FaFilter } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import {
@@ -16,6 +16,7 @@ import {
     Tooltip,
     Legend,
 } from 'chart.js';
+import axios from 'axios';
 
 // Register ChartJS components
 ChartJS.register(
@@ -30,9 +31,25 @@ ChartJS.register(
     Legend
 );
 
-export default function Stats({ link, visits, countryStats, deviceStats, dailyStats }) {
+export default function Stats({ link, visits, countryStats, deviceStats, browserStats, platformStats, dailyStats, avgTimeSpent }) {
     const [copied, setCopied] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
+    const [exporting, setExporting] = useState(false);
+    const [report, setReport] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [dateRange, setDateRange] = useState({
+        startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
+        endDate: new Date().toISOString().split('T')[0] // today
+    });
+    const [filteredStats, setFilteredStats] = useState({
+        visits: visits,
+        countryStats: countryStats,
+        deviceStats: deviceStats,
+        browserStats: browserStats,
+        platformStats: platformStats,
+        dailyStats: dailyStats,
+        avgTimeSpent: avgTimeSpent
+    });
 
     const handleCopy = () => {
         const shortUrl = `${window.location.origin}/${link.code}`;
@@ -42,13 +59,86 @@ export default function Stats({ link, visits, countryStats, deviceStats, dailySt
         });
     };
 
-    // Prepare data for charts
+    const handleDateChange = async (e) => {
+        const { name, value } = e.target;
+        const newDateRange = { ...dateRange, [name]: value };
+        setDateRange(newDateRange);
+        await fetchFilteredStats(newDateRange);
+    };
+
+    const fetchFilteredStats = async (range = dateRange) => {
+        setIsLoading(true);
+        try {
+            const response = await axios.get(`/links/stats/${link.id}/filter`, {
+                params: {
+                    startDate: range.startDate,
+                    endDate: range.endDate
+                }
+            });
+            setFilteredStats(response.data);
+        } catch (error) {
+            console.error('Failed to fetch filtered stats:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleExport = async (format, type = 'visits') => {
+        setExporting(true);
+        try {
+            const response = await axios.get(`/links/stats/${link.id}/export`, {
+                params: { 
+                    format, 
+                    type,
+                    startDate: dateRange.startDate,
+                    endDate: dateRange.endDate
+                },
+                responseType: 'blob'
+            });
+            
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const downloadLink = document.createElement('a');
+            downloadLink.href = url;
+            downloadLink.setAttribute('download', `analytics_${format}_${type}_${new Date().toISOString()}.${format}`);
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            downloadLink.remove();
+        } catch (error) {
+            console.error('Export failed:', error);
+        } finally {
+            setExporting(false);
+        }
+    };
+
+    const fetchReport = async () => {
+        try {
+            const response = await axios.get(`/links/stats/${link.id}/report`, {
+                params: {
+                    startDate: dateRange.startDate,
+                    endDate: dateRange.endDate
+                }
+            });
+            setReport(response.data);
+        } catch (error) {
+            console.error('Failed to fetch report:', error);
+        }
+    };
+
+    useEffect(() => {
+        fetchReport();
+    }, [link.id, dateRange]);
+
+    // Prepare data for charts using filteredStats instead of original stats
     const dailyData = {
-        labels: dailyStats.map(stat => new Date(stat.date).toLocaleDateString()),
+        labels: filteredStats.dailyStats.map(stat => {
+            // Format the date to be more readable
+            const date = new Date(stat.date);
+            return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        }),
         datasets: [
             {
                 label: 'Visits',
-                data: dailyStats.map(stat => stat.count),
+                data: filteredStats.dailyStats.map(stat => stat.count),
                 borderColor: 'rgb(99, 102, 241)',
                 backgroundColor: 'rgba(99, 102, 241, 0.1)',
                 tension: 0.3,
@@ -58,10 +148,10 @@ export default function Stats({ link, visits, countryStats, deviceStats, dailySt
     };
 
     const countryData = {
-        labels: countryStats.map(stat => stat.country || 'Unknown'),
+        labels: filteredStats.countryStats.map(stat => stat.country || 'Unknown'),
         datasets: [
             {
-                data: countryStats.map(stat => stat.count),
+                data: filteredStats.countryStats.map(stat => stat.count),
                 backgroundColor: [
                     'rgba(99, 102, 241, 0.8)',
                     'rgba(16, 185, 129, 0.8)',
@@ -74,21 +164,53 @@ export default function Stats({ link, visits, countryStats, deviceStats, dailySt
     };
 
     const deviceData = {
-        labels: deviceStats.map(stat => {
-            const device = stat.device.toLowerCase();
-            if (device.includes('mobile')) return 'Mobile';
-            if (device.includes('tablet')) return 'Tablet';
-            if (device.includes('windows') || device.includes('mac') || device.includes('linux')) return 'Desktop';
+        labels: filteredStats.deviceStats.map(stat => {
+            const deviceType = stat.device_type?.toLowerCase() || 'unknown';
+            if (deviceType.includes('mobile')) return 'Mobile';
+            if (deviceType.includes('tablet')) return 'Tablet';
+            if (deviceType.includes('desktop')) return 'Desktop';
             return 'Other';
         }),
         datasets: [
             {
-                data: deviceStats.map(stat => stat.count),
+                data: filteredStats.deviceStats.map(stat => stat.count),
                 backgroundColor: [
                     'rgba(99, 102, 241, 0.8)',
                     'rgba(16, 185, 129, 0.8)',
                     'rgba(245, 158, 11, 0.8)',
                     'rgba(239, 68, 68, 0.8)',
+                ],
+            },
+        ],
+    };
+
+    const browserData = {
+        labels: filteredStats.browserStats.map(stat => stat.browser || 'Unknown'),
+        datasets: [
+            {
+                data: filteredStats.browserStats.map(stat => stat.count),
+                backgroundColor: [
+                    'rgba(99, 102, 241, 0.8)',
+                    'rgba(16, 185, 129, 0.8)',
+                    'rgba(245, 158, 11, 0.8)',
+                    'rgba(239, 68, 68, 0.8)',
+                    'rgba(139, 92, 246, 0.8)',
+                ],
+            },
+        ],
+    };
+
+    const platformData = {
+        labels: filteredStats.platformStats.map(stat => stat.platform || 'Unknown'),
+        datasets: [
+            {
+                data: filteredStats.platformStats.map(stat => stat.count),
+                backgroundColor: [
+                    'rgba(99, 102, 241, 0.8)',
+                    'rgba(16, 185, 129, 0.8)',
+                    'rgba(245, 158, 11, 0.8)',
+                    'rgba(239, 68, 68, 0.8)',
+                    'rgba(139, 92, 246, 0.8)',
                 ],
             },
         ],
@@ -110,6 +232,11 @@ export default function Stats({ link, visits, countryStats, deviceStats, dailySt
             },
         },
     };
+
+    // Add console.log to debug the data
+    useEffect(() => {
+        console.log('Daily Stats:', filteredStats.dailyStats);
+    }, [filteredStats.dailyStats]);
 
     return (
         <AuthenticatedLayout>
@@ -172,8 +299,69 @@ export default function Stats({ link, visits, countryStats, deviceStats, dailySt
                                 </div>
                             </div>
 
+                            {/* Date Range Filter */}
+                            <div className="flex items-center space-x-4 mb-6 bg-gray-50 p-4 rounded-lg">
+                                <div className="flex items-center">
+                                    <FaFilter className="text-gray-400 mr-2" />
+                                    <span className="text-gray-700 font-medium">Filter by Date:</span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <div className="flex items-center">
+                                        <label htmlFor="startDate" className="mr-2 text-sm text-gray-600">From:</label>
+                                        <input
+                                            type="date"
+                                            id="startDate"
+                                            name="startDate"
+                                            value={dateRange.startDate}
+                                            onChange={handleDateChange}
+                                            className="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
+                                        />
+                                    </div>
+                                    <div className="flex items-center">
+                                        <label htmlFor="endDate" className="mr-2 text-sm text-gray-600">To:</label>
+                                        <input
+                                            type="date"
+                                            id="endDate"
+                                            name="endDate"
+                                            value={dateRange.endDate}
+                                            onChange={handleDateChange}
+                                            className="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
+                                        />
+                                    </div>
+                                </div>
+                                {isLoading && (
+                                    <div className="flex items-center text-gray-500">
+                                        <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        Updating...
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Export buttons */}
+                            <div className="flex justify-end space-x-2 mb-4">
+                                <button
+                                    onClick={() => handleExport('csv', 'visits')}
+                                    disabled={exporting || isLoading}
+                                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                                >
+                                    <FaDownload className="mr-2 h-4 w-4" />
+                                    Export CSV
+                                </button>
+                                <button
+                                    onClick={() => handleExport('xlsx', 'visits')}
+                                    disabled={exporting || isLoading}
+                                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                                >
+                                    <FaFileExport className="mr-2 h-4 w-4" />
+                                    Export Excel
+                                </button>
+                            </div>
+
                             {/* Stats Overview Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                                 <motion.div
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
@@ -183,7 +371,7 @@ export default function Stats({ link, visits, countryStats, deviceStats, dailySt
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-sm font-medium text-gray-500">Total Visits</p>
-                                            <p className="text-3xl font-bold text-gray-900">{visits.length}</p>
+                                            <p className="text-3xl font-bold text-gray-900">{filteredStats.visits.length}</p>
                                         </div>
                                         <div className="bg-indigo-100 p-3 rounded-full">
                                             <FaChartLine className="h-6 w-6 text-indigo-600" />
@@ -200,7 +388,7 @@ export default function Stats({ link, visits, countryStats, deviceStats, dailySt
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-sm font-medium text-gray-500">Countries</p>
-                                            <p className="text-3xl font-bold text-gray-900">{countryStats.length}</p>
+                                            <p className="text-3xl font-bold text-gray-900">{filteredStats.countryStats.length}</p>
                                         </div>
                                         <div className="bg-emerald-100 p-3 rounded-full">
                                             <FaGlobe className="h-6 w-6 text-emerald-600" />
@@ -217,10 +405,27 @@ export default function Stats({ link, visits, countryStats, deviceStats, dailySt
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-sm font-medium text-gray-500">Device Types</p>
-                                            <p className="text-3xl font-bold text-gray-900">{deviceStats.length}</p>
+                                            <p className="text-3xl font-bold text-gray-900">{filteredStats.deviceStats.length}</p>
                                         </div>
                                         <div className="bg-amber-100 p-3 rounded-full">
                                             <FaMobile className="h-6 w-6 text-amber-600" />
+                                        </div>
+                                    </div>
+                                </motion.div>
+
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.4 }}
+                                    className="bg-white border border-gray-200 rounded-lg shadow-sm p-6"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-500">Avg. Time Spent</p>
+                                            <p className="text-3xl font-bold text-gray-900">{Math.round(filteredStats.avgTimeSpent)}s</p>
+                                        </div>
+                                        <div className="bg-purple-100 p-3 rounded-full">
+                                            <FaClock className="h-6 w-6 text-purple-600" />
                                         </div>
                                     </div>
                                 </motion.div>
@@ -285,7 +490,31 @@ export default function Stats({ link, visits, countryStats, deviceStats, dailySt
                                         <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
                                             <h3 className="text-lg font-medium text-gray-900 mb-4">Daily Visits</h3>
                                             <div className="h-64">
-                                                <Line data={dailyData} options={chartOptions} />
+                                                {isLoading ? (
+                                                    <div className="flex items-center justify-center h-full">
+                                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                                                    </div>
+                                                ) : filteredStats.dailyStats.length > 0 ? (
+                                                    <Line 
+                                                        data={dailyData} 
+                                                        options={{
+                                                            ...chartOptions,
+                                                            scales: {
+                                                                y: {
+                                                                    beginAtZero: true,
+                                                                    ticks: {
+                                                                        precision: 0,
+                                                                        stepSize: 1
+                                                                    }
+                                                                }
+                                                            }
+                                                        }} 
+                                                    />
+                                                ) : (
+                                                    <div className="flex items-center justify-center h-full text-gray-500">
+                                                        No visit data available for the selected date range
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
@@ -305,7 +534,31 @@ export default function Stats({ link, visits, countryStats, deviceStats, dailySt
                                     >
                                         <h3 className="text-lg font-medium text-gray-900 mb-4">Daily Visit Trends</h3>
                                         <div className="h-80">
-                                            <Line data={dailyData} options={chartOptions} />
+                                            {isLoading ? (
+                                                <div className="flex items-center justify-center h-full">
+                                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                                                </div>
+                                            ) : filteredStats.dailyStats.length > 0 ? (
+                                                <Line 
+                                                    data={dailyData} 
+                                                    options={{
+                                                        ...chartOptions,
+                                                        scales: {
+                                                            y: {
+                                                                beginAtZero: true,
+                                                                ticks: {
+                                                                    precision: 0,
+                                                                    stepSize: 1
+                                                                }
+                                                            }
+                                                        }
+                                                    }} 
+                                                />
+                                            ) : (
+                                                <div className="flex items-center justify-center h-full text-gray-500">
+                                                    No visit data available for the selected date range
+                                                </div>
+                                            )}
                                         </div>
                                     </motion.div>
                                 )}
@@ -335,6 +588,69 @@ export default function Stats({ link, visits, countryStats, deviceStats, dailySt
                                         </div>
                                     </motion.div>
                                 )}
+
+                                {/* Add new charts for browser and platform stats */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                    <div className="bg-white p-6 rounded-lg shadow-sm">
+                                        <h3 className="text-lg font-medium text-gray-900 mb-4">Browser Distribution</h3>
+                                        <Doughnut data={browserData} options={chartOptions} />
+                                    </div>
+                                    <div className="bg-white p-6 rounded-lg shadow-sm">
+                                        <h3 className="text-lg font-medium text-gray-900 mb-4">Platform Distribution</h3>
+                                        <Doughnut data={platformData} options={chartOptions} />
+                                    </div>
+                                </div>
+
+                                {/* Enhanced Analytics Section */}
+                                {report && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                        <div className="bg-white p-6 rounded-lg shadow-sm">
+                                            <h3 className="text-lg font-medium text-gray-900 mb-4">Peak Hours</h3>
+                                            <div className="h-64">
+                                                <Bar
+                                                    data={{
+                                                        labels: Object.keys(report.peak_hours),
+                                                        datasets: [{
+                                                            label: 'Visits',
+                                                            data: Object.values(report.peak_hours),
+                                                            backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                                                        }]
+                                                    }}
+                                                    options={{
+                                                        ...chartOptions,
+                                                        scales: {
+                                                            y: {
+                                                                beginAtZero: true,
+                                                                title: {
+                                                                    display: true,
+                                                                    text: 'Number of Visits'
+                                                                }
+                                                            },
+                                                            x: {
+                                                                title: {
+                                                                    display: true,
+                                                                    text: 'Hour of Day'
+                                                                }
+                                                            }
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white p-6 rounded-lg shadow-sm">
+                                            <h3 className="text-lg font-medium text-gray-900 mb-4">Top Referrers</h3>
+                                            <div className="space-y-4">
+                                                {Object.entries(report.referrers).map(([url, count]) => (
+                                                    <div key={url} className="flex justify-between items-center">
+                                                        <span className="text-sm text-gray-600 truncate">{url || 'Direct'}</span>
+                                                        <span className="text-sm font-medium text-gray-900">{count}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Recent Visits Table */}
@@ -359,7 +675,7 @@ export default function Stats({ link, visits, countryStats, deviceStats, dailySt
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-gray-200">
-                                            {visits.slice(0, 10).map((visit, index) => (
+                                            {filteredStats.visits.slice(0, 10).map((visit, index) => (
                                                 <tr key={index}>
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                         {new Date(visit.visited_at).toLocaleString()}
