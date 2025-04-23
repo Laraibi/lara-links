@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Visit;
 use Illuminate\Http\Request;
 use Jenssegers\Agent\Agent;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class AnalyticsService
 {
@@ -73,13 +75,29 @@ class AnalyticsService
 
     protected function getCountryFromIp($ip)
     {
-        // TODO: Implement IP geolocation
+        try {
+            $response = Http::get("http://ip-api.com/json/{$ip}");
+            if ($response->ok()) {
+                $data = $response->json();
+                return $data['country'] ?? null;
+            }
+        } catch (\Exception $e) {
+            Log::error('Error getting country from IP: ' . $e->getMessage());
+        }
         return null;
     }
 
     protected function getCityFromIp($ip)
     {
-        // TODO: Implement IP geolocation
+        try {
+            $response = Http::get("http://ip-api.com/json/{$ip}");
+            if ($response->ok()) {
+                $data = $response->json();
+                return $data['city'] ?? null;
+            }
+        } catch (\Exception $e) {
+            Log::error('Error getting city from IP: ' . $e->getMessage());
+        }
         return null;
     }
 }
