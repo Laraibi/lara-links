@@ -21,6 +21,10 @@ Route::get('/', function () {
 Route::get('/dashboard', function () {
     $links = Link::where('user_id', Auth::id())
         ->withCount('visits')
+        ->with(['visits' => function($query) {
+            $query->where('visited_at', '>=', now()->subDays(7))
+                  ->orderBy('visited_at', 'desc');
+        }])
         ->get();
         
     return Inertia::render('Dashboard', [
