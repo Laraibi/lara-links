@@ -37,7 +37,6 @@ class AnalyticsService
             'screen_resolution' => $request->header('sec-ch-viewport-width') . 'x' . $request->header('sec-ch-viewport-height'),
             'referrer_url' => $request->header('referer'),
             'user_agent' => $request->userAgent(),
-            'session_started_at' => now(),
             'additional_data' => [
                 'is_robot' => $this->agent->isRobot(),
                 'is_mobile' => $this->agent->isMobile(),
@@ -51,14 +50,6 @@ class AnalyticsService
     {
         $visitData = $this->collectVisitData($request, $linkId);
         return Visit::create($visitData);
-    }
-
-    public function updateVisitSession(Visit $visit)
-    {
-        $visit->update([
-            'session_ended_at' => now(),
-            'time_spent' => $visit->session_started_at->diffInSeconds(now())
-        ]);
     }
 
     protected function getDeviceType()
