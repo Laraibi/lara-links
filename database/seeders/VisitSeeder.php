@@ -59,9 +59,6 @@ class VisitSeeder extends Seeder
                 // Generate random IP address
                 $ip = rand(1, 255) . '.' . rand(0, 255) . '.' . rand(0, 255) . '.' . rand(0, 255);
                 
-                // Generate random time spent (in seconds)
-                $timeSpent = rand(10, 3600);
-                
                 // Generate random referrer URL (50% chance of having one)
                 $referrerUrl = rand(0, 1) ? 'https://' . $platforms[array_rand($platforms)] . '.com/page' . rand(1, 10) : null;
                 
@@ -70,10 +67,6 @@ class VisitSeeder extends Seeder
                 
                 // Generate random visit date (between startDate and endDate)
                 $visitedAt = Carbon::createFromTimestamp(rand($startDate->timestamp, $endDate->timestamp));
-                
-                // Generate session times (session start before visit, session end after visit, but not crossing days)
-                $sessionStartedAt = $visitedAt->copy()->subMinutes(rand(1, 30));
-                $sessionEndedAt = $visitedAt->copy()->addMinutes(rand(1, 60));
                 
                 // Generate random UTM parameters (30% chance of having them)
                 $additionalData = [];
@@ -101,10 +94,7 @@ class VisitSeeder extends Seeder
                     'device_type' => $deviceType,
                     'screen_resolution' => $screenResolution,
                     'referrer_url' => $referrerUrl,
-                    'time_spent' => $timeSpent,
                     'user_agent' => $userAgent,
-                    'session_started_at' => $sessionStartedAt,
-                    'session_ended_at' => $sessionEndedAt,
                     'additional_data' => $additionalData
                 ]);
             }

@@ -44,7 +44,6 @@ class AnalyticsExportService
                         'Platform',
                         'Device Type',
                         'Screen Resolution',
-                        'Time Spent (seconds)',
                         'Referrer URL'
                     ]);
                     
@@ -72,7 +71,6 @@ class AnalyticsExportService
                             $visit->platform,
                             $visit->device_type,
                             $visit->screen_resolution,
-                            $visit->time_spent,
                             $visit->referrer_url
                         ]);
                     }
@@ -87,7 +85,6 @@ class AnalyticsExportService
                     
                     $csv->insertOne(['Total Visits', $visits->count()]);
                     $csv->insertOne(['Unique Countries', $visits->pluck('country')->unique()->count()]);
-                    $csv->insertOne(['Average Time Spent', round($visits->avg('time_spent'), 2)]);
                     
                     $mostCommonBrowser = $visits->pluck('browser')->countBy()->sortDesc()->keys()->first() ?? 'N/A';
                     $mostCommonPlatform = $visits->pluck('platform')->countBy()->sortDesc()->keys()->first() ?? 'N/A';
@@ -114,7 +111,6 @@ class AnalyticsExportService
                         'Platform',
                         'Device Type',
                         'Screen Resolution',
-                        'Time Spent (seconds)',
                         'Referrer URL'
                     ]);
                     
@@ -142,7 +138,6 @@ class AnalyticsExportService
                             $visit->platform,
                             $visit->device_type,
                             $visit->screen_resolution,
-                            $visit->time_spent,
                             $visit->referrer_url
                         ]);
                     }
@@ -197,8 +192,7 @@ class AnalyticsExportService
             $sheet->setCellValue('F1', 'Platform');
             $sheet->setCellValue('G1', 'Device Type');
             $sheet->setCellValue('H1', 'Screen Resolution');
-            $sheet->setCellValue('I1', 'Time Spent (seconds)');
-            $sheet->setCellValue('J1', 'Referrer URL');
+            $sheet->setCellValue('I1', 'Referrer URL');
             
             // Add date range filter info
             if ($startDate || $endDate) {
@@ -245,13 +239,12 @@ class AnalyticsExportService
                 $sheet->setCellValue("F{$row}", $visit->platform);
                 $sheet->setCellValue("G{$row}", $visit->device_type);
                 $sheet->setCellValue("H{$row}", $visit->screen_resolution);
-                $sheet->setCellValue("I{$row}", $visit->time_spent);
-                $sheet->setCellValue("J{$row}", $visit->referrer_url);
+                $sheet->setCellValue("I{$row}", $visit->referrer_url);
                 $row++;
             }
             
             // Auto-size columns
-            foreach (range('A', 'J') as $col) {
+            foreach (range('A', 'I') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
             
@@ -297,7 +290,6 @@ class AnalyticsExportService
             'browsers' => $visits->pluck('browser')->countBy(),
             'platforms' => $visits->pluck('platform')->countBy(),
             'device_types' => $visits->pluck('device_type')->countBy(),
-            'average_time_spent' => round($visits->avg('time_spent'), 2),
             'peak_hours' => $this->calculatePeakHours($visits),
             'daily_stats' => $this->calculateDailyStats($visits),
             'referrers' => $visits->pluck('referrer_url')

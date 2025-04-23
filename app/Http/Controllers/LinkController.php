@@ -154,10 +154,8 @@ class LinkController extends Controller
             ->orderBy('date')
             ->get();
 
-        // Get average time spent
-        $avgTimeSpent = $link->visits()
-            ->whereNotNull('time_spent')
-            ->avg('time_spent');
+        // Get average time spent - removed as session tracking is no longer available
+        $avgTimeSpent = 0;
 
         return Inertia::render('Stats', [
             'link' => $link,
@@ -367,10 +365,8 @@ class LinkController extends Controller
             ->orderBy('date')
             ->get();
 
-        // Get filtered average time spent
-        $avgTimeSpent = (clone $visitsQuery)
-            ->whereNotNull('time_spent')
-            ->avg('time_spent');
+        // Get filtered average time spent - removed as session tracking is no longer available
+        $avgTimeSpent = 0;
 
         return response()->json([
             'visits' => $visits,
