@@ -378,4 +378,54 @@ class LinkController extends Controller
             'avgTimeSpent' => round($avgTimeSpent ?? 0, 2),
         ]);
     }
+
+    public function generateQrCode(Link $link)
+    {
+        // Check if the user is authorized to generate QR code for this link
+        if ($link->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        try {
+            $qrCodePath = $link->generateQrCode();
+            
+            if (!$qrCodePath) {
+                return response()->json([
+                    'error' => 'QR code generation is disabled for this link'
+                ], 400);
+            }
+
+            return response()->json([
+                'success' => true,
+                'qr_code_url' => $link->getQrCodeUrl()
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to generate QR code: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function toggleQrCode(Link $link)
+    {
+        // Check if the user is authorized to modify this link
+        if ($link->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        try {
+            $link->update([
+                'qr_code_enabled' => !$link->qr_code_enabled
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'qr_code_enabled' => $link->qr_code_enabled
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to toggle QR code: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

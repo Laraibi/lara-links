@@ -44,6 +44,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/stats/{link}/export', "exportAnalytics")->name('link.export');
         Route::get('/stats/{link}/report', "getAnalyticsReport")->name('link.report');
         Route::get('/stats/{link}/filter', "filterAnalytics")->name('link.filter');
+        Route::post('/{link}/qr-code', "generateQrCode")->name('link.qr-code');
+        Route::post('/{link}/toggle-qr-code', "toggleQrCode")->name('link.toggle-qr-code');
         Route::delete('/{link}', "destroy")->name('links.destroy');
         Route::put('/{link}', "update")->name('links.update');
     });
