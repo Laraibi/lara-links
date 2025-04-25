@@ -24,7 +24,8 @@ class Visit extends Model
         'screen_resolution',
         'referrer_url',
         'user_agent',
-        'additional_data'
+        'additional_data',
+        'source'
     ];
 
     protected $casts = [

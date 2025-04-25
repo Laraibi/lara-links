@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Head } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { FaArrowLeft, FaChartLine, FaGlobe, FaMobile, FaCalendarAlt, FaExternalLinkAlt, FaCopy, FaCheck, FaClock, FaDownload, FaFileExport, FaFilter } from 'react-icons/fa';
+import { FaArrowLeft, FaChartLine, FaGlobe, FaMobile, FaCalendarAlt, FaExternalLinkAlt, FaCopy, FaCheck, FaClock, FaDownload, FaFileExport, FaFilter, FaQrcode, FaToggleOn, FaToggleOff } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import {
@@ -31,12 +31,14 @@ ChartJS.register(
     Legend
 );
 
-export default function Stats({ link, visits, countryStats, deviceStats, browserStats, platformStats, dailyStats, avgTimeSpent }) {
+export default function Stats({ link, visits, countryStats, deviceStats, browserStats, platformStats, dailyStats, avgTimeSpent, qrCodeStats, qrCodeDailyStats }) {
     const [copied, setCopied] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
     const [exporting, setExporting] = useState(false);
     const [report, setReport] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [qrCodeLoading, setQrCodeLoading] = useState(false);
+    const [qrCodeError, setQrCodeError] = useState(null);
     const [dateRange, setDateRange] = useState({
         startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
         endDate: new Date().toISOString().split('T')[0] // today
@@ -48,7 +50,13 @@ export default function Stats({ link, visits, countryStats, deviceStats, browser
         browserStats: browserStats,
         platformStats: platformStats,
         dailyStats: dailyStats,
-        avgTimeSpent: avgTimeSpent
+        avgTimeSpent: avgTimeSpent,
+        qrCodeStats: qrCodeStats || {
+            total: 0,
+            direct: 0,
+            percentage: 0
+        },
+        qrCodeDailyStats: qrCodeDailyStats || []
     });
 
     const handleCopy = () => {
@@ -75,7 +83,15 @@ export default function Stats({ link, visits, countryStats, deviceStats, browser
                     endDate: range.endDate
                 }
             });
-            setFilteredStats(response.data);
+            setFilteredStats({
+                ...response.data,
+                qrCodeStats: response.data.qrCodeStats || {
+                    total: 0,
+                    direct: 0,
+                    percentage: 0
+                },
+                qrCodeDailyStats: response.data.qrCodeDailyStats || []
+            });
         } catch (error) {
             console.error('Failed to fetch filtered stats:', error);
         } finally {
@@ -237,6 +253,54 @@ export default function Stats({ link, visits, countryStats, deviceStats, browser
     useEffect(() => {
         console.log('Daily Stats:', filteredStats.dailyStats);
     }, [filteredStats.dailyStats]);
+
+    const handleToggleQrCode = async () => {
+        setQrCodeLoading(true);
+        setQrCodeError(null);
+        try {
+            const response = await axios.post(`/links/${link.id}/toggle-qr-code`);
+            // Update the link object with the new QR code status
+            link.qr_code_enabled = response.data.qr_code_enabled;
+        } catch (error) {
+            setQrCodeError('Failed to toggle QR code status');
+            console.error('Failed to toggle QR code:', error);
+        } finally {
+            setQrCodeLoading(false);
+        }
+    };
+
+    const handleGenerateQrCode = async () => {
+        setQrCodeLoading(true);
+        setQrCodeError(null);
+        try {
+            const response = await axios.post(`/links/${link.id}/qr-code`);
+            // Update the link object with the new QR code URL
+            link.qr_code_url = response.data.qr_code_url;
+        } catch (error) {
+            setQrCodeError('Failed to generate QR code');
+            console.error('Failed to generate QR code:', error);
+        } finally {
+            setQrCodeLoading(false);
+        }
+    };
+
+    // Prepare data for QR code chart
+    const qrCodeData = {
+        labels: qrCodeDailyStats.map(stat => {
+            const date = new Date(stat.date);
+            return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        }),
+        datasets: [
+            {
+                label: 'QR Code Scans',
+                data: qrCodeDailyStats.map(stat => stat.count),
+                borderColor: 'rgb(139, 92, 246)',
+                backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                tension: 0.3,
+                fill: true,
+            },
+        ],
+    };
 
     return (
         <AuthenticatedLayout>
@@ -475,6 +539,17 @@ export default function Stats({ link, visits, countryStats, deviceStats, browser
                                         >
                                             Devices
                                         </button>
+                                        <button
+                                            onClick={() => setActiveTab('qr-code')}
+                                            className={`${
+                                                activeTab === 'qr-code'
+                                                    ? 'border-indigo-500 text-indigo-600'
+                                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
+                                        >
+                                            <FaQrcode className="mr-2" />
+                                            QR Code
+                                        </button>
                                     </nav>
                                 </div>
                             </div>
@@ -650,6 +725,153 @@ export default function Stats({ link, visits, countryStats, deviceStats, browser
                                             </div>
                                         </div>
                                     </div>
+                                )}
+
+                                {activeTab === 'qr-code' && (
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        className="space-y-6"
+                                    >
+                                        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+                                            <div className="flex items-center justify-between mb-6">
+                                                <h3 className="text-lg font-medium text-gray-900">QR Code Management</h3>
+                                                <button
+                                                    onClick={handleToggleQrCode}
+                                                    disabled={qrCodeLoading}
+                                                    className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md ${
+                                                        link.qr_code_enabled
+                                                            ? 'text-red-700 bg-red-100 hover:bg-red-200'
+                                                            : 'text-green-700 bg-green-100 hover:bg-green-200'
+                                                    } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50`}
+                                                >
+                                                    {qrCodeLoading ? (
+                                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                                                    ) : link.qr_code_enabled ? (
+                                                        <>
+                                                            <FaToggleOn className="mr-2 h-5 w-5" />
+                                                            Disable QR Code
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <FaToggleOff className="mr-2 h-5 w-5" />
+                                                            Enable QR Code
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
+
+                                            {qrCodeError && (
+                                                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+                                                    <p className="text-sm text-red-600">{qrCodeError}</p>
+                                                </div>
+                                            )}
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div className="space-y-4">
+                                                    <div className="bg-gray-50 p-4 rounded-lg">
+                                                        <h4 className="text-sm font-medium text-gray-500 mb-2">Status</h4>
+                                                        <p className="text-lg font-semibold text-gray-900">
+                                                            {link.qr_code_enabled ? 'Enabled' : 'Disabled'}
+                                                        </p>
+                                                    </div>
+                                                    
+                                                    {link.qr_code_enabled && (
+                                                        <>
+                                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                                <h4 className="text-sm font-medium text-gray-500 mb-2">QR Code Style</h4>
+                                                                <p className="text-lg font-semibold text-gray-900">
+                                                                    {link.qr_code_style || 'Default'}
+                                                                </p>
+                                                            </div>
+                                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                                <h4 className="text-sm font-medium text-gray-500 mb-2">Total Scans</h4>
+                                                                <p className="text-lg font-semibold text-gray-900">
+                                                                    {qrCodeStats.total}
+                                                                </p>
+                                                            </div>
+                                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                                <h4 className="text-sm font-medium text-gray-500 mb-2">Usage Percentage</h4>
+                                                                <p className="text-lg font-semibold text-gray-900">
+                                                                    {qrCodeStats.percentage}% of total visits
+                                                                </p>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+
+                                                {link.qr_code_enabled && (
+                                                    <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-lg">
+                                                        {link.qr_code_url ? (
+                                                            <>
+                                                                <img
+                                                                    src={link.qr_code_url}
+                                                                    alt="QR Code"
+                                                                    className="w-48 h-48 mb-4"
+                                                                />
+                                                                <div className="flex space-x-2">
+                                                                    <a
+                                                                        href={link.qr_code_url}
+                                                                        download={`qr-code-${link.code}.png`}
+                                                                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                                                    >
+                                                                        <FaDownload className="mr-2 h-4 w-4" />
+                                                                        Download
+                                                                    </a>
+                                                                    <button
+                                                                        onClick={handleGenerateQrCode}
+                                                                        disabled={qrCodeLoading}
+                                                                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                                                                    >
+                                                                        <FaQrcode className="mr-2 h-4 w-4" />
+                                                                        Regenerate
+                                                                    </button>
+                                                                </div>
+                                                            </>
+                                                        ) : (
+                                                            <button
+                                                                onClick={handleGenerateQrCode}
+                                                                disabled={qrCodeLoading}
+                                                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                                            >
+                                                                <FaQrcode className="mr-2 h-5 w-5" />
+                                                                Generate QR Code
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {link.qr_code_enabled && qrCodeDailyStats.length > 0 && (
+                                            <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+                                                <h3 className="text-lg font-medium text-gray-900 mb-4">QR Code Scan History</h3>
+                                                <div className="h-64">
+                                                    {isLoading ? (
+                                                        <div className="flex items-center justify-center h-full">
+                                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                                                        </div>
+                                                    ) : (
+                                                        <Line 
+                                                            data={qrCodeData} 
+                                                            options={{
+                                                                ...chartOptions,
+                                                                scales: {
+                                                                    y: {
+                                                                        beginAtZero: true,
+                                                                        ticks: {
+                                                                            precision: 0,
+                                                                            stepSize: 1
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }} 
+                                                        />
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </motion.div>
                                 )}
                             </div>
 

@@ -66,8 +66,14 @@ class LinkController extends Controller
         // Find the link by code
         $link = Link::where('code', $code)->firstOrFail();
 
-        // Record the visit using our analytics service
-        $visit = $this->analyticsService->recordVisit($request, $link->id);
+        // Check if the visit came from a QR code
+        $source = 'direct';
+        if ($request->has('source') && $request->source === 'qr') {
+            $source = 'qr';
+        }
+
+        // Record the visit using our analytics service with the source
+        $visit = $this->analyticsService->recordVisit($request, $link->id, $source);
 
         // Redirect to the original URL
         return redirect()->to($link->original);
@@ -154,6 +160,24 @@ class LinkController extends Controller
             ->orderBy('date')
             ->get();
 
+        // Get QR code statistics
+        $qrCodeStats = [
+            'total' => $link->visits()->where('source', 'qr')->count(),
+            'direct' => $link->visits()->where('source', 'direct')->count(),
+            'percentage' => $link->visits()->count() > 0 
+                ? round(($link->visits()->where('source', 'qr')->count() / $link->visits()->count()) * 100, 2) 
+                : 0
+        ];
+
+        // Get QR code visits by day (last 30 days)
+        $qrCodeDailyStats = $link->visits()
+            ->selectRaw('DATE(visited_at) as date, COUNT(*) as count')
+            ->where('source', 'qr')
+            ->where('visited_at', '>=', now()->subDays(30))
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get();
+
         // Get average time spent - removed as session tracking is no longer available
         $avgTimeSpent = 0;
 
@@ -165,6 +189,8 @@ class LinkController extends Controller
             'browserStats' => $browserStats,
             'platformStats' => $platformStats,
             'dailyStats' => $dailyStats,
+            'qrCodeStats' => $qrCodeStats,
+            'qrCodeDailyStats' => $qrCodeDailyStats,
             'avgTimeSpent' => round($avgTimeSpent ?? 0, 2),
         ]);
     }
@@ -365,6 +391,23 @@ class LinkController extends Controller
             ->orderBy('date')
             ->get();
 
+        // Get filtered QR code stats
+        $qrCodeStats = [
+            'total' => (clone $visitsQuery)->where('source', 'qr')->count(),
+            'direct' => (clone $visitsQuery)->where('source', 'direct')->count(),
+            'percentage' => $visits->count() > 0 
+                ? round(((clone $visitsQuery)->where('source', 'qr')->count() / $visits->count()) * 100, 2) 
+                : 0
+        ];
+
+        // Get filtered QR code daily stats
+        $qrCodeDailyStats = (clone $visitsQuery)
+            ->selectRaw('DATE(visited_at) as date, COUNT(*) as count')
+            ->where('source', 'qr')
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get();
+
         // Get filtered average time spent - removed as session tracking is no longer available
         $avgTimeSpent = 0;
 
@@ -375,6 +418,8 @@ class LinkController extends Controller
             'browserStats' => $browserStats,
             'platformStats' => $platformStats,
             'dailyStats' => $dailyStats,
+            'qrCodeStats' => $qrCodeStats,
+            'qrCodeDailyStats' => $qrCodeDailyStats,
             'avgTimeSpent' => round($avgTimeSpent ?? 0, 2),
         ]);
     }
@@ -387,6 +432,12 @@ class LinkController extends Controller
         }
 
         try {
+            // If regenerate is requested, delete the old QR code
+            if (request()->has('regenerate') && $link->qr_code_path) {
+                Storage::disk('public')->delete($link->qr_code_path);
+                $link->update(['qr_code_path' => null]);
+            }
+
             $qrCodePath = $link->generateQrCode();
             
             if (!$qrCodePath) {
