@@ -80,39 +80,77 @@ export default function EnhancedStats({ links }) {
     };
 
     // Prepare data for device distribution
-    const deviceData = {
-        labels: ['Desktop', 'Mobile', 'Tablet'],
-        datasets: [
-            {
-                data: [65, 25, 10], // Example data - replace with actual data
-                backgroundColor: [
-                    'rgba(59, 130, 246, 0.5)',
-                    'rgba(16, 185, 129, 0.5)',
-                    'rgba(245, 158, 11, 0.5)',
-                ],
-                borderColor: [
-                    'rgb(59, 130, 246)',
-                    'rgb(16, 185, 129)',
-                    'rgb(245, 158, 11)',
-                ],
-                borderWidth: 1,
-            },
-        ],
-    };
+    const deviceData = useMemo(() => {
+        // Aggregate device types across all links
+        const deviceCounts = links.reduce((acc, link) => {
+            link.visits?.forEach(visit => {
+                const deviceType = visit.device_type?.toLowerCase() || 'unknown';
+                let category = 'Other';
+                if (deviceType.includes('mobile')) category = 'Mobile';
+                else if (deviceType.includes('tablet')) category = 'Tablet';
+                else if (deviceType.includes('desktop')) category = 'Desktop';
+                
+                acc[category] = (acc[category] || 0) + 1;
+            });
+            return acc;
+        }, {});
+
+        // Convert to array format for chart
+        const labels = Object.keys(deviceCounts);
+        const data = Object.values(deviceCounts);
+
+        return {
+            labels,
+            datasets: [
+                {
+                    data,
+                    backgroundColor: [
+                        'rgba(59, 130, 246, 0.5)',
+                        'rgba(16, 185, 129, 0.5)',
+                        'rgba(245, 158, 11, 0.5)',
+                        'rgba(239, 68, 68, 0.5)',
+                    ],
+                    borderColor: [
+                        'rgb(59, 130, 246)',
+                        'rgb(16, 185, 129)',
+                        'rgb(245, 158, 11)',
+                        'rgb(239, 68, 68)',
+                    ],
+                    borderWidth: 1,
+                },
+            ],
+        };
+    }, [links]);
 
     // Prepare data for geographic distribution
-    const geographicData = {
-        labels: ['USA', 'UK', 'Canada', 'Germany', 'France'],
-        datasets: [
-            {
-                label: 'Visits by Country',
-                data: [30, 25, 15, 20, 10], // Example data - replace with actual data
-                backgroundColor: 'rgba(59, 130, 246, 0.5)',
-                borderColor: 'rgb(59, 130, 246)',
-                borderWidth: 1,
-            },
-        ],
-    };
+    const geographicData = useMemo(() => {
+        // Aggregate countries across all links
+        const countryCounts = links.reduce((acc, link) => {
+            link.visits?.forEach(visit => {
+                const country = visit.country || 'Unknown';
+                acc[country] = (acc[country] || 0) + 1;
+            });
+            return acc;
+        }, {});
+
+        // Sort countries by visit count and take top 5
+        const sortedCountries = Object.entries(countryCounts)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 5);
+
+        return {
+            labels: sortedCountries.map(([country]) => country),
+            datasets: [
+                {
+                    label: 'Visits by Country',
+                    data: sortedCountries.map(([, count]) => count),
+                    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                    borderColor: 'rgb(59, 130, 246)',
+                    borderWidth: 1,
+                },
+            ],
+        };
+    }, [links]);
 
     return (
         <div className="space-y-6">
