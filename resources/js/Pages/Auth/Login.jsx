@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Checkbox from "@/Components/Checkbox";
 import InputError from "@/Components/InputError";
 import InputLabel from "@/Components/InputLabel";
@@ -15,11 +15,20 @@ export default function Login({ status, canResetPassword }) {
         remember: false,
     });
 
+    const [isDemoLogin, setIsDemoLogin] = useState(false);
+
     useEffect(() => {
         return () => {
             reset('password');
         };
     }, []);
+
+    useEffect(() => {
+        if (isDemoLogin && data.email === "demo@example.com" && data.password === "demo123") {
+            post(route("login"));
+            setIsDemoLogin(false);
+        }
+    }, [data, isDemoLogin]);
 
     const submit = (e) => {
         e.preventDefault();
@@ -32,7 +41,7 @@ export default function Login({ status, canResetPassword }) {
             password: "demo123",
             remember: false,
         });
-        post(route("login"));
+        setIsDemoLogin(true);
     };
 
     return (
