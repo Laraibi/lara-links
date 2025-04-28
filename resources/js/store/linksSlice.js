@@ -14,10 +14,11 @@ const linksSlice = createSlice({
             state.links = action.payload;
         },
         updateLink: (state, action) => {
-            const { id, name } = action.payload;
+            const { id, ...updates } = action.payload;
             const link = state.links.find(link => link.id === id);
             if (link) {
-                link.name = name;
+                // Update all properties provided in the updates object
+                Object.assign(link, updates);
             }
         },
         deleteLink: (state, action) => {

@@ -100,7 +100,12 @@ class LinkController extends Controller
     {
         $links = Link::where('user_id', Auth::user()->id)
             ->withCount('visits') // Count visits for each link
-            ->get();
+            ->get()
+            ->map(function ($link) {
+                $linkArray = $link->toArray();
+                $linkArray['qr_code_url'] = $link->getQrCodeUrl();
+                return $linkArray;
+            });
 
         // Check if the request expects JSON (API request)
         if (request()->expectsJson()) {
@@ -182,7 +187,9 @@ class LinkController extends Controller
         $avgTimeSpent = 0;
 
         return Inertia::render('Stats', [
-            'link' => $link,
+            'link' => array_merge($link->toArray(), [
+                'qr_code_url' => $link->getQrCodeUrl()
+            ]),
             'visits' => $visits,
             'countryStats' => $countryStats,
             'deviceStats' => $deviceStats,
@@ -459,7 +466,7 @@ class LinkController extends Controller
 
     public function toggleQrCode(Link $link)
     {
-        // Check if the user is authorized to modify this link
+        // Check if the user is authorized to toggle QR code for this link
         if ($link->user_id !== Auth::id()) {
             abort(403, 'Unauthorized action.');
         }
@@ -478,5 +485,26 @@ class LinkController extends Controller
                 'error' => 'Failed to toggle QR code: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    public function getQrCode(Link $link)
+    {
+        // Check if the user is authorized to view this link's QR code
+        if ($link->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        // If the link has a QR code path, return the URL
+        if ($link->qr_code_path) {
+            return response()->json([
+                'success' => true,
+                'qr_code_url' => $link->getQrCodeUrl()
+            ]);
+        }
+
+        // Otherwise, return a 404 response
+        return response()->json([
+            'error' => 'QR code not found'
+        ], 404);
     }
 }

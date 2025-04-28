@@ -110,6 +110,11 @@ export default function LinksCard({ links: initialLinks }) {
         setQrCodeModal({ isOpen: false, link: null });
     };
 
+    const handleQrCodeGenerated = (linkId, qrCodeUrl) => {
+        // Update the link in the Redux store
+        dispatch(updateLink({ id: linkId, qr_code_url: qrCodeUrl }));
+    };
+
     return (
         <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
             <div className="p-6">
@@ -231,6 +236,7 @@ export default function LinksCard({ links: initialLinks }) {
                     isOpen={qrCodeModal.isOpen}
                     onClose={closeQrCodeModal}
                     link={qrCodeModal.link}
+                    onQrCodeGenerated={(qrCodeUrl) => handleQrCodeGenerated(qrCodeModal.link.id, qrCodeUrl)}
                 />
             </div>
         </div>

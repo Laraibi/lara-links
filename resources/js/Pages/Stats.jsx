@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Head } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { FaArrowLeft, FaChartLine, FaGlobe, FaMobile, FaCalendarAlt, FaExternalLinkAlt, FaCopy, FaCheck, FaClock, FaDownload, FaFileExport, FaFilter, FaQrcode, FaToggleOn, FaToggleOff } from 'react-icons/fa';
+import { FaArrowLeft, FaChartLine, FaGlobe, FaMobile, FaCalendarAlt, FaExternalLinkAlt, FaCopy, FaCheck, FaClock, FaDownload, FaFileExport, FaFilter, FaQrcode, FaToggleOn, FaToggleOff, FaSync } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import {
@@ -269,11 +269,11 @@ export default function Stats({ link, visits, countryStats, deviceStats, browser
         }
     };
 
-    const handleGenerateQrCode = async () => {
+    const handleGenerateQrCode = async (regenerate = false) => {
         setQrCodeLoading(true);
         setQrCodeError(null);
         try {
-            const response = await axios.post(`/links/${link.id}/qr-code`);
+            const response = await axios.post(`/links/${link.id}/qr-code${regenerate ? '?regenerate=true' : ''}`);
             // Update the link object with the new QR code URL
             link.qr_code_url = response.data.qr_code_url;
         } catch (error) {
@@ -812,18 +812,17 @@ export default function Stats({ link, visits, countryStats, deviceStats, browser
                                                                 <div className="flex space-x-2">
                                                                     <a
                                                                         href={link.qr_code_url}
-                                                                        download={`qr-code-${link.code}.png`}
+                                                                        download={`qr-code-${link.id}.png`}
                                                                         className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                                                                     >
-                                                                        <FaDownload className="mr-2 h-4 w-4" />
+                                                                        <FaDownload className="mr-2" />
                                                                         Download
                                                                     </a>
                                                                     <button
-                                                                        onClick={handleGenerateQrCode}
-                                                                        disabled={qrCodeLoading}
+                                                                        onClick={() => handleGenerateQrCode(true)}
                                                                         className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                                                                     >
-                                                                        <FaQrcode className="mr-2 h-4 w-4" />
+                                                                        <FaSync className="mr-2" />
                                                                         Regenerate
                                                                     </button>
                                                                 </div>
@@ -831,10 +830,9 @@ export default function Stats({ link, visits, countryStats, deviceStats, browser
                                                         ) : (
                                                             <button
                                                                 onClick={handleGenerateQrCode}
-                                                                disabled={qrCodeLoading}
-                                                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                                                             >
-                                                                <FaQrcode className="mr-2 h-5 w-5" />
+                                                                <FaQrcode className="mr-2" />
                                                                 Generate QR Code
                                                             </button>
                                                         )}
