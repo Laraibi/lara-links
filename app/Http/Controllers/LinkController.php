@@ -256,8 +256,9 @@ class LinkController extends Controller
             ]);
 
             // Update the link name, converting empty string to null
+            $name = $request->input('name');
             $link->update([
-                'name' => $request->input('name') ?: null,
+                'name' => $name === '' ? null : $name,
             ]);
             
             // Refresh the link to get the updated data

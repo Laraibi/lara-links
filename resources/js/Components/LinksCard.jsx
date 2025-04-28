@@ -16,7 +16,9 @@ export default function LinksCard({ links: initialLinks }) {
     const [qrCodeModal, setQrCodeModal] = useState({ isOpen: false, link: null });
     const inputRef = useRef(null);
     const { delete: destroy, processing: deleteProcessing } = useForm();
-    const { data, setData, put, processing: updateProcessing, errors, reset } = useForm({
+    
+    // Create a separate form for each link edit
+    const updateForm = useForm({
         name: '',
     });
 
@@ -64,6 +66,8 @@ export default function LinksCard({ links: initialLinks }) {
     };
 
     const startEditing = (link) => {
+        // Set the form data when starting to edit
+        updateForm.setData('name', link.name || '');
         setEditingLinkId(link.id);
         setEditingName(link.name || '');
     };
@@ -71,10 +75,15 @@ export default function LinksCard({ links: initialLinks }) {
     const cancelEditing = () => {
         setEditingLinkId(null);
         setEditingName('');
+        updateForm.reset();
     };
 
     const handleUpdate = (link) => {
-        put(route('links.update', link), {
+        // Set the current editingName as the form data
+        updateForm.setData('name', editingName);
+        
+        // Use the form with updated data
+        updateForm.put(route('links.update', link), {
             preserveScroll: true,
             onSuccess: () => {
                 dispatch(updateLink({ id: link.id, name: editingName }));
@@ -92,6 +101,13 @@ export default function LinksCard({ links: initialLinks }) {
                 });
             }
         });
+    };
+
+    const handleNameChange = (e) => {
+        const newName = e.target.value;
+        setEditingName(newName);
+        // Synchronously update the form data as the user types
+        updateForm.setData('name', newName);
     };
 
     const handleKeyDown = (e, link) => {
@@ -129,7 +145,7 @@ export default function LinksCard({ links: initialLinks }) {
                                                 ref={inputRef}
                                                 type="text"
                                                 value={editingName}
-                                                onChange={(e) => setEditingName(e.target.value)}
+                                                onChange={handleNameChange}
                                                 onKeyDown={(e) => handleKeyDown(e, link)}
                                                 className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                                                 placeholder="Enter link name"
@@ -199,7 +215,7 @@ export default function LinksCard({ links: initialLinks }) {
                                         <div className="flex space-x-2">
                                             <button
                                                 onClick={() => handleUpdate(link)}
-                                                disabled={updateProcessing}
+                                                disabled={updateForm.processing}
                                                 className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                                             >
                                                 <FaCheck className="h-4 w-4 mr-1" />
@@ -241,4 +257,4 @@ export default function LinksCard({ links: initialLinks }) {
             </div>
         </div>
     );
-} 
+}
