@@ -441,7 +441,7 @@ class LinkController extends Controller
 
         try {
             // If regenerate is requested, delete the old QR code
-            if (request()->has('regenerate') && $link->qr_code_path) {
+            if ( $link->qr_code_path) {
                 Storage::disk('public')->delete($link->qr_code_path);
                 $link->update(['qr_code_path' => null]);
             }
