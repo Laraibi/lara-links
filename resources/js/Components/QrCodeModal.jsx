@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { FaDownload, FaSync } from "react-icons/fa";
 import axios from "axios";
+import { router } from '@inertiajs/react';
 
 export default function QrCodeModal({
     isOpen,
@@ -30,7 +31,7 @@ export default function QrCodeModal({
         setError(null);
         try {
             // Make a GET request to check if a QR code exists
-            const response = await axios.get(`/links/${link.id}/qr-code`);
+            const response = await axios.get(route('link.get-qr-code', { link: link.id }));
             if (response.data.qr_code_url) {
                 setQrCodeUrl(response.data.qr_code_url);
                 // Call the callback to update the parent component
@@ -57,9 +58,10 @@ export default function QrCodeModal({
         setError(null);
         try {
             const response = await axios.post(
-                `/links/${link.id}/qr-code${
-                    regenerate ? "?regenerate=true" : ""
-                }`
+                route('link.qr-code', { 
+                    link: link.id,
+                    regenerate: regenerate 
+                })
             );
             const newQrCodeUrl = response.data.qr_code_url;
             setQrCodeUrl(newQrCodeUrl);
