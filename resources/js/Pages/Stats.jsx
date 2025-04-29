@@ -34,7 +34,7 @@ ChartJS.register(
     Filler
 );
 
-export default function Stats({ link, visits, countryStats, deviceStats, browserStats, platformStats, dailyStats, avgTimeSpent, qrCodeStats, qrCodeDailyStats }) {
+export default function Stats({ auth, link, visits, countryStats, deviceStats, browserStats, platformStats, dailyStats, avgTimeSpent, qrCodeStats, qrCodeDailyStats }) {
     const { t, i18n } = useTranslation();
     const [copied, setCopied] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
@@ -435,125 +435,152 @@ export default function Stats({ link, visits, countryStats, deviceStats, browser
     };
 
     return (
-        <AuthenticatedLayout>
-            <Head title={t('stats.overview')} />
+        <AuthenticatedLayout
+            user={auth.user}
+            header={
+                <div className="flex items-center">
+                    <button
+                        onClick={() => window.history.back()}
+                        className="mr-4 text-gray-600 hover:text-gray-900"
+                    >
+                        <FaArrowLeft className="h-5 w-5" />
+                    </button>
+                    <h2 className="font-semibold text-xl text-gray-800 leading-tight">
+                        {t('stats.linkStatistics')}
+                    </h2>
+                </div>
+            }
+        >
+            <Head title={t('stats.linkStatistics')} />
 
             <div className="py-12">
-                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                    <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                        <div className="p-6 text-gray-900">
-                            <div className="flex items-center justify-between mb-6">
+                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+                    {/* Link Info Card */}
+                    <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <button
+                                onClick={() => window.history.back()}
+                                className="flex items-center text-gray-600 hover:text-gray-900"
+                            >
+                                <span className="mr-2">←</span>
+                                {t('common.back')}
+                            </button>
+                            <div className="flex items-center space-x-4">
                                 <button
-                                    onClick={() => window.history.back()}
-                                    className="flex items-center text-gray-600 hover:text-gray-900"
+                                    onClick={() => handleExport('csv', 'visits')}
+                                    disabled={exporting}
+                                    className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                                 >
-                                    <span className="mr-2">←</span>
-                                    {t('common.back')}
+                                    {t('stats.exportCsv')}
                                 </button>
-                                <div className="flex items-center space-x-4">
+                                <button
+                                    onClick={() => handleExport('xlsx', 'visits')}
+                                    disabled={exporting}
+                                    className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                >
+                                    {t('stats.exportExcel')}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center space-x-4 mb-6">
+                            <div className="flex-1">
+                                <h1 className="text-2xl font-semibold text-gray-900">{link.original}</h1>
+                                <div className="mt-1 flex items-center">
+                                    <span className="text-sm text-gray-500">{window.location.origin}/{link.code}</span>
                                     <button
-                                        onClick={() => handleExport('csv', 'visits')}
-                                        disabled={exporting}
-                                        className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                        onClick={handleCopy}
+                                        className="ml-2 text-indigo-600 hover:text-indigo-900"
                                     >
-                                        {t('stats.exportCsv')}
-                                    </button>
-                                    <button
-                                        onClick={() => handleExport('xlsx', 'visits')}
-                                        disabled={exporting}
-                                        className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                                    >
-                                        {t('stats.exportExcel')}
+                                        {copied ? t('common.copied') : t('common.copy')}
                                     </button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
 
-                            <div className="flex items-center space-x-4 mb-6">
-                                <div className="flex-1">
-                                    <h1 className="text-2xl font-semibold text-gray-900">{link.original}</h1>
-                                    <div className="mt-1 flex items-center">
-                                        <span className="text-sm text-gray-500">{window.location.origin}/{link.code}</span>
-                                        <button
-                                            onClick={handleCopy}
-                                            className="ml-2 text-indigo-600 hover:text-indigo-900"
-                                        >
-                                            {copied ? t('common.copied') : t('common.copy')}
-                                        </button>
-                                    </div>
+                    {/* Date Range Filter */}
+                    <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
+                        <div className="mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">{t('stats.filterByDate')}</label>
+                            <div className="flex space-x-4">
+                                <div>
+                                    <label className="block text-xs text-gray-500">{t('common.from')}</label>
+                                    <input
+                                        type="date"
+                                        name="startDate"
+                                        value={dateRange.startDate}
+                                        onChange={handleDateChange}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-gray-500">{t('common.to')}</label>
+                                    <input
+                                        type="date"
+                                        name="endDate"
+                                        value={dateRange.endDate}
+                                        onChange={handleDateChange}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                    />
                                 </div>
                             </div>
+                        </div>
+                    </div>
 
-                            <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">{t('stats.filterByDate')}</label>
-                                <div className="flex space-x-4">
-                                    <div>
-                                        <label className="block text-xs text-gray-500">{t('common.from')}</label>
-                                        <input
-                                            type="date"
-                                            name="startDate"
-                                            value={dateRange.startDate}
-                                            onChange={handleDateChange}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs text-gray-500">{t('common.to')}</label>
-                                        <input
-                                            type="date"
-                                            name="endDate"
-                                            value={dateRange.endDate}
-                                            onChange={handleDateChange}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
+                    {/* Tabs and Content */}
+                    <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                        <div className="border-b border-gray-200">
+                            <nav className="-mb-px flex" aria-label="Tabs">
+                                <button
+                                    onClick={() => setActiveTab('overview')}
+                                    className={`${
+                                        activeTab === 'overview'
+                                            ? 'border-indigo-500 text-indigo-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    } w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm`}
+                                >
+                                    <FaChartLine className="h-5 w-5 mx-auto mb-1" />
+                                    {t('stats.overview')}
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('countries')}
+                                    className={`${
+                                        activeTab === 'countries'
+                                            ? 'border-indigo-500 text-indigo-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    } w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm`}
+                                >
+                                    <FaGlobe className="h-5 w-5 mx-auto mb-1" />
+                                    {t('stats.countries')}
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('devices')}
+                                    className={`${
+                                        activeTab === 'devices'
+                                            ? 'border-indigo-500 text-indigo-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    } w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm`}
+                                >
+                                    <FaMobile className="h-5 w-5 mx-auto mb-1" />
+                                    {t('stats.devices')}
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('qrcode')}
+                                    className={`${
+                                        activeTab === 'qrcode'
+                                            ? 'border-indigo-500 text-indigo-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    } w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm`}
+                                >
+                                    <FaQrcode className="h-5 w-5 mx-auto mb-1" />
+                                    {t('stats.qrCode')}
+                                </button>
+                            </nav>
+                        </div>
 
-                            <div className="border-b border-gray-200 mb-6">
-                                <nav className="-mb-px flex space-x-8">
-                                    <button
-                                        onClick={() => setActiveTab('overview')}
-                                        className={`${
-                                            activeTab === 'overview'
-                                                ? 'border-indigo-500 text-indigo-600'
-                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                        } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-                                    >
-                                        {t('stats.overview')}
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('countries')}
-                                        className={`${
-                                            activeTab === 'countries'
-                                                ? 'border-indigo-500 text-indigo-600'
-                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                        } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-                                    >
-                                        {t('stats.countries')}
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('devices')}
-                                        className={`${
-                                            activeTab === 'devices'
-                                                ? 'border-indigo-500 text-indigo-600'
-                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                        } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-                                    >
-                                        {t('stats.devices')}
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('qrcode')}
-                                        className={`${
-                                            activeTab === 'qrcode'
-                                                ? 'border-indigo-500 text-indigo-600'
-                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                        } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-                                    >
-                                        {t('stats.qrCode')}
-                                    </button>
-                                </nav>
-                            </div>
-
+                        {/* Tab Content */}
+                        <div className="p-6">
                             {activeTab === 'overview' && (
                                 <motion.div
                                     initial={{ opacity: 0 }}
@@ -791,48 +818,96 @@ export default function Stats({ link, visits, countryStats, deviceStats, browser
                                 </motion.div>
                             )}
 
-                            {/* Recent Visits Table */}
-                            <div className="mt-8">
-                                <h3 className="text-lg font-medium text-gray-900 mb-4">{t('stats.recentVisits')}</h3>
-                                <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-                                    <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50">
-                                            <tr>
-                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    {t('stats.date')}
-                                                </th>
-                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    {t('stats.country')}
-                                                </th>
-                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    {t('stats.device')}
-                                                </th>
-                                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    {t('stats.ipAddress')}
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="bg-white divide-y divide-gray-200">
-                                            {filteredStats.visits.slice(0, 10).map((visit, index) => (
-                                                <tr key={index}>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        {new Date(visit.visited_at).toLocaleString()}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        {visit.country || t('common.unknown')}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        {visit.device}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        {visit.ip}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                            {activeTab === 'countries' && (
+                                <div className="space-y-6">
+                                    <div className="bg-white rounded-lg shadow p-6">
+                                        <h3 className="text-lg font-medium text-gray-900 mb-4">
+                                            {t('stats.geographicDistribution')}
+                                        </h3>
+                                        <div className="h-64">
+                                            <Doughnut 
+                                                data={countryData}
+                                                options={{
+                                                    responsive: true,
+                                                    maintainAspectRatio: false,
+                                                    plugins: {
+                                                        legend: {
+                                                            position: 'right',
+                                                        }
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
+
+                            {activeTab === 'devices' && (
+                                <div className="space-y-6">
+                                    <div className="bg-white rounded-lg shadow p-6">
+                                        <h3 className="text-lg font-medium text-gray-900 mb-4">
+                                            {t('stats.deviceDistribution')}
+                                        </h3>
+                                        <div className="h-64">
+                                            <Doughnut 
+                                                data={deviceData}
+                                                options={{
+                                                    responsive: true,
+                                                    maintainAspectRatio: false,
+                                                    plugins: {
+                                                        legend: {
+                                                            position: 'right',
+                                                        }
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'qrcode' && (
+                                <div className="space-y-6">
+                                    <div className="bg-white rounded-lg shadow p-6">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="text-lg font-medium text-gray-900">
+                                                {t('stats.qrCodeStatistics')}
+                                            </h3>
+                                            <div className="flex items-center space-x-4">
+                                                <button
+                                                    onClick={() => handleToggleQrCode()}
+                                                    className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
+                                                >
+                                                    {link.qr_code_enabled ? (
+                                                        <FaToggleOn className="h-6 w-6 text-indigo-600" />
+                                                    ) : (
+                                                        <FaToggleOff className="h-6 w-6" />
+                                                    )}
+                                                    <span className="ml-2">
+                                                        {link.qr_code_enabled ? t('qrCode.enabled') : t('qrCode.disabled')}
+                                                    </span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {link.qr_code_enabled && (
+                                            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <div className="bg-gray-50 p-4 rounded-lg">
+                                                    <h4 className="text-sm font-medium text-gray-500">{t('stats.totalQrScans')}</h4>
+                                                    <p className="mt-1 text-2xl font-semibold text-gray-900">{filteredStats.qrCodeStats.total}</p>
+                                                </div>
+                                                <div className="bg-gray-50 p-4 rounded-lg">
+                                                    <h4 className="text-sm font-medium text-gray-500">{t('stats.directVisits')}</h4>
+                                                    <p className="mt-1 text-2xl font-semibold text-gray-900">{filteredStats.qrCodeStats.direct}</p>
+                                                </div>
+                                                <div className="bg-gray-50 p-4 rounded-lg">
+                                                    <h4 className="text-sm font-medium text-gray-500">{t('stats.qrCodePercentage')}</h4>
+                                                    <p className="mt-1 text-2xl font-semibold text-gray-900">{filteredStats.qrCodeStats.percentage}%</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
