@@ -139,9 +139,18 @@ class LinkController extends Controller
         // Get visit counts by device type
         $deviceStats = $link->visits()
             ->selectRaw('device_type, COUNT(*) as count')
+            ->whereNotNull('device_type')
             ->groupBy('device_type')
             ->orderByDesc('count')
             ->get();
+
+        // Log the stats for debugging
+        Log::info('Link Stats:', [
+            'link_id' => $link->id,
+            'country_stats' => $countryStats->toArray(),
+            'device_stats' => $deviceStats->toArray(),
+            'total_visits' => $visits->count()
+        ]);
 
         // Get visit counts by browser
         $browserStats = $link->visits()
