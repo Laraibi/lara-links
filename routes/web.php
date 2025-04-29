@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Models\Link;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\DashboardController;
 
 Route::get('/', function () {
     // return Inertia::render('Welcome', [
@@ -18,19 +19,9 @@ Route::get('/', function () {
     return redirect("/login");
 });
 
-Route::get('/dashboard', function () {
-    $links = Link::where('user_id', Auth::id())
-        ->withCount('visits')
-        ->with(['visits' => function($query) {
-            $query->where('visited_at', '>=', now()->subDays(7))
-                  ->orderBy('visited_at', 'desc');
-        }])
-        ->get();
-        
-    return Inertia::render('Dashboard', [
-        'links' => $links
-    ]);
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -55,3 +46,5 @@ Route::middleware('auth')->group(function () {
 require __DIR__ . '/auth.php';
 Route::get('/{code}', [LinkController::class, 'redirectToOriginal'])
     ->where('code', '^[0-9a-zA-Z]{6}$');
+
+Route::get('language/{locale}', [App\Http\Controllers\LanguageController::class, 'switch'])->name('language.switch');

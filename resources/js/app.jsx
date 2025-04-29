@@ -6,8 +6,10 @@ import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { Provider } from 'react-redux';
 import { store } from './store';
+import { I18nextProvider } from 'react-i18next';
+import i18n from './i18n';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = window.document.getElementsByTagName('title')[0]?.innerText || 'Laravel';
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
@@ -19,10 +21,13 @@ createInertiaApp({
     setup({ el, App, props }) {
         const root = createRoot(el);
 
+        // Render the app immediately
         root.render(
-            <Provider store={store}>
-                <App {...props} />
-            </Provider>
+            <I18nextProvider i18n={i18n}>
+                <Provider store={store}>
+                    <App {...props} />
+                </Provider>
+            </I18nextProvider>
         );
     },
     progress: {
