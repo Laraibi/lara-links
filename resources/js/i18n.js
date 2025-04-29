@@ -15,22 +15,51 @@ const resources = {
   },
 };
 
-// Get initial language from localStorage or default to 'en'
-let initialLanguage = 'en';
-try {
-  const storedLanguage = localStorage.getItem('i18nextLng');
-  const htmlLang = document.documentElement.lang;
-  initialLanguage = storedLanguage || htmlLang || 'en';
-} catch (error) {
-  console.warn('Could not access localStorage:', error);
-}
+// Function to get initial language from various sources
+const getInitialLanguage = () => {
+  try {
+    // First check localStorage
+    const storedLanguage = localStorage.getItem('i18nextLng');
+    if (storedLanguage && ['en', 'fr'].includes(storedLanguage)) {
+      return storedLanguage;
+    }
+
+    // Then check cookie
+    const cookies = document.cookie.split(';');
+    const localeCookie = cookies.find(cookie => cookie.trim().startsWith('locale='));
+    if (localeCookie) {
+      const cookieValue = localeCookie.split('=')[1].trim();
+      if (['en', 'fr'].includes(cookieValue)) {
+        return cookieValue;
+      }
+    }
+
+    // Then check HTML lang attribute
+    const htmlLang = document.documentElement.lang;
+    if (htmlLang && ['en', 'fr'].includes(htmlLang)) {
+      return htmlLang;
+    }
+
+    // Finally check browser language
+    const browserLang = navigator.language.split('-')[0];
+    if (['en', 'fr'].includes(browserLang)) {
+      return browserLang;
+    }
+
+    // Default to English
+    return 'en';
+  } catch (error) {
+    console.warn('Error getting initial language:', error);
+    return 'en';
+  }
+};
 
 i18n
   .use(initReactI18next)
   .use(LanguageDetector)
   .init({
     resources,
-    lng: initialLanguage,
+    lng: getInitialLanguage(),
     fallbackLng: 'en',
     supportedLngs: ['en', 'fr'],
     debug: false,
@@ -38,8 +67,10 @@ i18n
       escapeValue: false,
     },
     detection: {
-      order: ['localStorage', 'htmlTag', 'navigator'],
-      caches: ['localStorage'],
+      order: ['localStorage', 'cookie', 'htmlTag', 'navigator'],
+      caches: ['localStorage', 'cookie'],
+      cookieMinutes: 60 * 24 * 365, // 1 year
+      lookupCookie: 'locale',
       lookupLocalStorage: 'i18nextLng',
     },
     react: {
@@ -47,13 +78,19 @@ i18n
     }
   });
 
-// Listen for language changes and sync with localStorage and HTML lang
+// Sync language changes across storage mechanisms
 i18n.on('languageChanged', (lng) => {
   try {
+    // Update localStorage
     localStorage.setItem('i18nextLng', lng);
+
+    // Update cookie
+    document.cookie = `locale=${lng};path=/;max-age=${60 * 24 * 365}`;
+
+    // Update HTML lang attribute
     document.documentElement.lang = lng;
   } catch (error) {
-    console.warn('Could not save language preference:', error);
+    console.warn('Error syncing language:', error);
   }
 });
 

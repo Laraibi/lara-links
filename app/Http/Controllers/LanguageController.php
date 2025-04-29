@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cookie;
 
 class LanguageController extends Controller
 {
@@ -31,9 +32,15 @@ class LanguageController extends Controller
             'app_locale' => App::getLocale()
         ]);
 
-        return redirect()->back()->with([
+        // Create the response
+        $response = redirect()->back()->with([
             'locale' => $locale,
             'message' => 'Language switched successfully'
         ]);
+
+        // Set a long-lived cookie for the locale
+        $response->cookie('locale', $locale, 60 * 24 * 365); // Cookie valid for 1 year
+
+        return $response;
     }
 } 

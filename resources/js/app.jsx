@@ -4,30 +4,39 @@ import '../css/app.css';
 import { createRoot } from 'react-dom/client';
 import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
-import { Provider } from 'react-redux';
-import { store } from './store';
 import { I18nextProvider } from 'react-i18next';
 import i18n from './i18n';
+import { Provider } from 'react-redux';
+import store from './store';
 
-const appName = window.document.getElementsByTagName('title')[0]?.innerText || 'Laravel';
+const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+
+// Function to initialize i18n with the server-side locale
+const initializeI18n = (locale) => {
+    if (locale && locale !== i18n.language) {
+        i18n.changeLanguage(locale);
+        // Also update localStorage to keep it in sync
+        localStorage.setItem('i18nextLng', locale);
+        document.documentElement.lang = locale;
+    }
+};
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
-    resolve: (name) =>
-        resolvePageComponent(
-            `./Pages/${name}.jsx`,
-            import.meta.glob('./Pages/**/*.jsx'),
-        ),
+    resolve: (name) => resolvePageComponent(`./Pages/${name}.jsx`, import.meta.glob('./Pages/**/*.jsx')),
     setup({ el, App, props }) {
         const root = createRoot(el);
 
-        // Render the app immediately
+        // Initialize i18n with the server-side locale
+        initializeI18n(props.initialPage.props.locale);
+
+        // Wrap the app with necessary providers
         root.render(
-            <I18nextProvider i18n={i18n}>
-                <Provider store={store}>
+            <Provider store={store}>
+                <I18nextProvider i18n={i18n}>
                     <App {...props} />
-                </Provider>
-            </I18nextProvider>
+                </I18nextProvider>
+            </Provider>
         );
     },
     progress: {
