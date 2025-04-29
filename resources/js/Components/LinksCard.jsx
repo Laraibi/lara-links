@@ -7,10 +7,10 @@ import { updateLink, deleteLink, setLinks } from '@/store/linksSlice';
 import QrCodeModal from './QrCodeModal';
 import { useTranslation } from 'react-i18next';
 
-export default function LinksCard({ links: initialLinks }) {
+export default function LinksCard({ links: initialLinks = [] }) {
     const { t } = useTranslation();
     const dispatch = useDispatch();
-    const links = useSelector(state => state.links.links);
+    const links = useSelector(state => state.links.links) || [];
     const [copiedLink, setCopiedLink] = useState(null);
     const [notification, setNotification] = useState(null);
     const [editingLinkId, setEditingLinkId] = useState(null);
@@ -26,7 +26,9 @@ export default function LinksCard({ links: initialLinks }) {
 
     // Initialize Redux store with initial links
     useEffect(() => {
-        dispatch(setLinks(initialLinks));
+        if (initialLinks && initialLinks.length > 0) {
+            dispatch(setLinks(initialLinks));
+        }
     }, [initialLinks, dispatch]);
 
     // Focus the input when editing starts
@@ -137,7 +139,7 @@ export default function LinksCard({ links: initialLinks }) {
         <>
             <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div className="p-6">
-                    {links.length > 0 ? (
+                    {links && links.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {links.map((link) => (
                                 <div key={link.id} className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
@@ -200,9 +202,9 @@ export default function LinksCard({ links: initialLinks }) {
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(link)}
-                                                disabled={deleteProcessing}
-                                                className="text-gray-400 hover:text-gray-500 disabled:opacity-50"
+                                                className="text-gray-400 hover:text-gray-500"
                                                 title={t('links.deleteLink')}
+                                                disabled={deleteProcessing}
                                             >
                                                 <FaTrash className="h-5 w-5" />
                                             </button>
@@ -239,24 +241,25 @@ export default function LinksCard({ links: initialLinks }) {
                         </div>
                     ) : (
                         <div className="text-center py-8">
-                            <p className="text-gray-500">{t('links.noLinksFound')}</p>
+                            <p className="text-gray-500">{t('links.noLinks')}</p>
                         </div>
-                    )}
-
-                    {notification && (
-                        <Notification
-                            type={notification.type}
-                            message={notification.message}
-                            onClose={() => setNotification(null)}
-                        />
                     )}
                 </div>
             </div>
+
+            {notification && (
+                <Notification
+                    type={notification.type}
+                    message={notification.message}
+                    onClose={() => setNotification(null)}
+                />
+            )}
+
             <QrCodeModal
                 isOpen={qrCodeModal.isOpen}
-                onClose={closeQrCodeModal}
                 link={qrCodeModal.link}
-                onQrCodeGenerated={(qrCodeUrl) => handleQrCodeGenerated(qrCodeModal.link?.id, qrCodeUrl)}
+                onClose={closeQrCodeModal}
+                onQrCodeGenerated={handleQrCodeGenerated}
             />
         </>
     );

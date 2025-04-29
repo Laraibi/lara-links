@@ -7,7 +7,7 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { I18nextProvider } from 'react-i18next';
 import i18n from './i18n';
 import { Provider } from 'react-redux';
-import store from './store';
+import { store } from './store/index';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -15,8 +15,7 @@ const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 const initializeI18n = (locale) => {
     if (locale && locale !== i18n.language) {
         i18n.changeLanguage(locale);
-        // Also update localStorage to keep it in sync
-        localStorage.setItem('i18nextLng', locale);
+        // Update HTML lang attribute
         document.documentElement.lang = locale;
     }
 };

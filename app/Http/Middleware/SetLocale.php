@@ -16,36 +16,41 @@ class SetLocale
     public function handle(Request $request, Closure $next): Response
     {
         // First check session
-        $locale = Session::get('locale');
-        
-        // If no locale in session, check cookie
-        if (!$locale) {
+        if (Session::has('locale')) {
+            $locale = Session::get('locale');
+        }
+        // Then check cookie
+        else if ($request->hasCookie('locale')) {
             $locale = $request->cookie('locale');
+            // Store in session for future requests
+            Session::put('locale', $locale);
         }
-        
-        // If no locale in cookie, check browser preference
-        if (!$locale) {
-            $locale = $request->getPreferredLanguage(config('app.available_locales'));
+        // Finally check Accept-Language header
+        else {
+            $locale = $request->getPreferredLanguage(['en', 'fr']);
+            // Store in both session and cookie
+            Session::put('locale', $locale);
+            cookie()->queue('locale', $locale, 60 * 24 * 365); // 1 year
         }
-        
-        // If still no locale, use default
-        if (!$locale || !in_array($locale, config('app.available_locales'))) {
-            $locale = config('app.locale');
+
+        // Ensure locale is valid
+        if (!in_array($locale, ['en', 'fr'])) {
+            $locale = 'en';
+            Session::put('locale', $locale);
+            cookie()->queue('locale', $locale, 60 * 24 * 365); // 1 year
         }
 
         // Set the application locale
         App::setLocale($locale);
-        
-        // Store in session for future requests
-        Session::put('locale', $locale);
 
-        // Get the response
-        $response = $next($request);
-
-        // If the response is a regular HTTP response, set the locale cookie
-        if ($response instanceof \Illuminate\Http\Response || $response instanceof \Illuminate\Http\RedirectResponse) {
-            $response->cookie('locale', $locale, 60 * 24 * 365); // Cookie valid for 1 year
+        // Set cookie if not already set
+        if (!$request->hasCookie('locale')) {
+            cookie()->queue('locale', $locale, 60 * 24 * 365); // 1 year
         }
+
+        // Set the locale in the response
+        $response = $next($request);
+        $response->headers->set('Content-Language', $locale);
 
         return $response;
     }

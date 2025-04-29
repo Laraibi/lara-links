@@ -18,13 +18,7 @@ const resources = {
 // Function to get initial language from various sources
 const getInitialLanguage = () => {
   try {
-    // First check localStorage
-    const storedLanguage = localStorage.getItem('i18nextLng');
-    if (storedLanguage && ['en', 'fr'].includes(storedLanguage)) {
-      return storedLanguage;
-    }
-
-    // Then check cookie
+    // First check cookie
     const cookies = document.cookie.split(';');
     const localeCookie = cookies.find(cookie => cookie.trim().startsWith('locale='));
     if (localeCookie) {
@@ -55,23 +49,22 @@ const getInitialLanguage = () => {
 };
 
 i18n
-  .use(initReactI18next)
   .use(LanguageDetector)
+  .use(initReactI18next)
   .init({
     resources,
     lng: getInitialLanguage(),
     fallbackLng: 'en',
     supportedLngs: ['en', 'fr'],
-    debug: false,
+    debug: process.env.NODE_ENV === 'development',
     interpolation: {
       escapeValue: false,
     },
     detection: {
-      order: ['localStorage', 'cookie', 'htmlTag', 'navigator'],
-      caches: ['localStorage', 'cookie'],
-      cookieMinutes: 60 * 24 * 365, // 1 year
+      order: ['cookie', 'navigator'],
+      caches: ['cookie'],
       lookupCookie: 'locale',
-      lookupLocalStorage: 'i18nextLng',
+      cookieMinutes: 60 * 24 * 365, // 1 year
     },
     react: {
       useSuspense: false
@@ -81,12 +74,9 @@ i18n
 // Sync language changes across storage mechanisms
 i18n.on('languageChanged', (lng) => {
   try {
-    // Update localStorage
-    localStorage.setItem('i18nextLng', lng);
-
     // Update cookie
     document.cookie = `locale=${lng};path=/;max-age=${60 * 24 * 365}`;
-
+    
     // Update HTML lang attribute
     document.documentElement.lang = lng;
   } catch (error) {
@@ -97,9 +87,13 @@ i18n.on('languageChanged', (lng) => {
 // Handle Inertia page visits
 document.addEventListener('inertia:before', (event) => {
   try {
-    const locale = localStorage.getItem('i18nextLng');
-    if (locale && locale !== i18n.language) {
-      i18n.changeLanguage(locale);
+    const cookies = document.cookie.split(';');
+    const localeCookie = cookies.find(cookie => cookie.trim().startsWith('locale='));
+    if (localeCookie) {
+      const locale = localeCookie.split('=')[1].trim();
+      if (locale && locale !== i18n.language) {
+        i18n.changeLanguage(locale);
+      }
     }
   } catch (error) {
     console.warn('Could not restore language preference:', error);

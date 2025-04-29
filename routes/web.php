@@ -8,6 +8,7 @@ use Inertia\Inertia;
 use App\Models\Link;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\LanguageController;
 
 Route::get('/', function () {
     // return Inertia::render('Welcome', [
@@ -41,10 +42,11 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{link}', "destroy")->name('links.destroy');
         Route::put('/{link}', "update")->name('links.update');
     });
+
+    // Language switch route
+    Route::post('/language/{locale}', [LanguageController::class, 'switch'])->name('language.switch');
 });
 
 require __DIR__ . '/auth.php';
 Route::get('/{code}', [LinkController::class, 'redirectToOriginal'])
     ->where('code', '^[0-9a-zA-Z]{6}$');
-
-Route::get('language/{locale}', [App\Http\Controllers\LanguageController::class, 'switch'])->name('language.switch');
