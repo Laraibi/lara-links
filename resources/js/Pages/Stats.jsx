@@ -15,8 +15,10 @@ import {
     Title,
     Tooltip,
     Legend,
+    Filler
 } from 'chart.js';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 
 // Register ChartJS components
 ChartJS.register(
@@ -28,10 +30,12 @@ ChartJS.register(
     ArcElement,
     Title,
     Tooltip,
-    Legend
+    Legend,
+    Filler
 );
 
 export default function Stats({ link, visits, countryStats, deviceStats, browserStats, platformStats, dailyStats, avgTimeSpent, qrCodeStats, qrCodeDailyStats }) {
+    const { t, i18n } = useTranslation();
     const [copied, setCopied] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
     const [exporting, setExporting] = useState(false);
@@ -58,6 +62,88 @@ export default function Stats({ link, visits, countryStats, deviceStats, browser
         },
         qrCodeDailyStats: qrCodeDailyStats || []
     });
+
+    // Prepare data for charts using filteredStats
+    const deviceData = {
+        labels: filteredStats.deviceStats.map(stat => {
+            const deviceType = stat.device_type?.toLowerCase() || 'unknown';
+            if (deviceType.includes('mobile')) return t('stats.mobileVisits');
+            if (deviceType.includes('tablet')) return t('stats.tabletVisits');
+            if (deviceType.includes('desktop')) return t('stats.desktopVisits');
+            return t('common.unknown');
+        }),
+        datasets: [
+            {
+                data: filteredStats.deviceStats.map(stat => stat.count),
+                backgroundColor: [
+                    'rgba(99, 102, 241, 0.8)',  // Indigo
+                    'rgba(16, 185, 129, 0.8)',  // Green
+                    'rgba(245, 158, 11, 0.8)',  // Yellow
+                    'rgba(239, 68, 68, 0.8)',   // Red
+                ],
+                borderWidth: 2,
+                borderColor: '#FFFFFF',
+                hoverOffset: 4,
+                label: t('stats.deviceDistribution')
+            },
+        ],
+    };
+
+    const countryData = {
+        labels: filteredStats.countryStats.map(stat => stat.country || t('common.unknown')),
+        datasets: [
+            {
+                data: filteredStats.countryStats.map(stat => stat.count),
+                backgroundColor: [
+                    'rgba(99, 102, 241, 0.8)',   // Indigo
+                    'rgba(16, 185, 129, 0.8)',   // Green
+                    'rgba(245, 158, 11, 0.8)',   // Yellow
+                    'rgba(239, 68, 68, 0.8)',    // Red
+                    'rgba(139, 92, 246, 0.8)',   // Purple
+                    'rgba(14, 165, 233, 0.8)',   // Sky
+                    'rgba(236, 72, 153, 0.8)',   // Pink
+                ],
+                borderWidth: 2,
+                borderColor: '#FFFFFF',
+                hoverOffset: 4,
+                label: t('stats.geographicDistribution')
+            },
+        ],
+    };
+
+    // Add debugging logs for data and chart rendering
+    useEffect(() => {
+        console.log('Stats Data:', {
+            deviceStats,
+            countryStats,
+            filteredStats,
+            chartData: {
+                deviceData,
+                countryData
+            }
+        });
+    }, [deviceStats, countryStats, filteredStats, deviceData, countryData]);
+
+    // Add effect to ensure language persistence
+    useEffect(() => {
+        const storedLanguage = localStorage.getItem('i18nextLng');
+        if (storedLanguage && storedLanguage !== i18n.language) {
+            i18n.changeLanguage(storedLanguage);
+        }
+    }, []);
+
+    // Add effect to update translations when language changes
+    useEffect(() => {
+        const handleLanguageChange = () => {
+            // Force update of chart data to trigger re-render with new translations
+            setFilteredStats(prevStats => ({...prevStats}));
+        };
+
+        i18n.on('languageChanged', handleLanguageChange);
+        return () => {
+            i18n.off('languageChanged', handleLanguageChange);
+        };
+    }, [i18n]);
 
     const handleCopy = () => {
         const shortUrl = `${window.location.origin}/${link.code}`;
@@ -144,109 +230,155 @@ export default function Stats({ link, visits, countryStats, deviceStats, browser
         fetchReport();
     }, [link.id, dateRange]);
 
-    // Prepare data for charts using filteredStats instead of original stats
+    const commonChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    padding: 20,
+                    usePointStyle: true,
+                    font: {
+                        size: 12
+                    }
+                }
+            },
+            tooltip: {
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                padding: 12,
+                titleFont: {
+                    size: 14,
+                    weight: 'bold'
+                },
+                bodyFont: {
+                    size: 13
+                },
+                cornerRadius: 4,
+                displayColors: true
+            }
+        }
+    };
+
+    const lineChartOptions = {
+        ...commonChartOptions,
+        plugins: {
+            ...commonChartOptions.plugins,
+            legend: {
+                ...commonChartOptions.plugins.legend,
+                position: 'top'
+            }
+        },
+        scales: {
+            x: {
+                grid: {
+                    display: false
+                },
+                ticks: {
+                    maxRotation: 45,
+                    minRotation: 45
+                }
+            },
+            y: {
+                beginAtZero: true,
+                grid: {
+                    color: 'rgba(0, 0, 0, 0.1)'
+                }
+            }
+        }
+    };
+
+    const doughnutChartOptions = {
+        ...commonChartOptions,
+        cutout: '60%',
+        plugins: {
+            ...commonChartOptions.plugins,
+            legend: {
+                ...commonChartOptions.plugins.legend,
+                position: 'bottom',
+                display: true
+            },
+            tooltip: {
+                ...commonChartOptions.plugins.tooltip,
+                callbacks: {
+                    label: function(context) {
+                        const value = context.raw;
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const percentage = ((value / total) * 100).toFixed(1);
+                        return `${context.label}: ${value} (${percentage}%)`;
+                    }
+                }
+            }
+        }
+    };
+
+    // Prepare data for charts using filteredStats
     const dailyData = {
         labels: filteredStats.dailyStats.map(stat => {
-            // Format the date to be more readable
             const date = new Date(stat.date);
             return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
         }),
         datasets: [
             {
-                label: 'Visits',
+                label: t('stats.dailyVisits'),
                 data: filteredStats.dailyStats.map(stat => stat.count),
                 borderColor: 'rgb(99, 102, 241)',
                 backgroundColor: 'rgba(99, 102, 241, 0.1)',
                 tension: 0.3,
                 fill: true,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                pointBackgroundColor: 'rgb(99, 102, 241)',
+                pointBorderColor: 'white',
+                pointBorderWidth: 2,
             },
         ],
     };
 
-    const countryData = {
-        labels: filteredStats.countryStats.map(stat => stat.country || 'Unknown'),
-        datasets: [
-            {
-                data: filteredStats.countryStats.map(stat => stat.count),
-                backgroundColor: [
-                    'rgba(99, 102, 241, 0.8)',
-                    'rgba(16, 185, 129, 0.8)',
-                    'rgba(245, 158, 11, 0.8)',
-                    'rgba(239, 68, 68, 0.8)',
-                    'rgba(139, 92, 246, 0.8)',
-                ],
-            },
-        ],
-    };
-
-    const deviceData = {
-        labels: filteredStats.deviceStats.map(stat => {
-            const deviceType = stat.device_type?.toLowerCase() || 'unknown';
-            if (deviceType.includes('mobile')) return 'Mobile';
-            if (deviceType.includes('tablet')) return 'Tablet';
-            if (deviceType.includes('desktop')) return 'Desktop';
-            return 'Other';
-        }),
-        datasets: [
-            {
-                data: filteredStats.deviceStats.map(stat => stat.count),
-                backgroundColor: [
-                    'rgba(99, 102, 241, 0.8)',
-                    'rgba(16, 185, 129, 0.8)',
-                    'rgba(245, 158, 11, 0.8)',
-                    'rgba(239, 68, 68, 0.8)',
-                ],
-            },
-        ],
-    };
+    // Add debugging for device data
+    useEffect(() => {
+        console.log('Device Data:', deviceData);
+    }, [deviceData]);
 
     const browserData = {
-        labels: filteredStats.browserStats.map(stat => stat.browser || 'Unknown'),
+        labels: filteredStats.browserStats.map(stat => stat.browser || t('common.unknown')),
         datasets: [
             {
                 data: filteredStats.browserStats.map(stat => stat.count),
                 backgroundColor: [
-                    'rgba(99, 102, 241, 0.8)',
-                    'rgba(16, 185, 129, 0.8)',
-                    'rgba(245, 158, 11, 0.8)',
-                    'rgba(239, 68, 68, 0.8)',
-                    'rgba(139, 92, 246, 0.8)',
+                    'rgba(99, 102, 241, 0.8)',   // Indigo
+                    'rgba(16, 185, 129, 0.8)',   // Green
+                    'rgba(245, 158, 11, 0.8)',   // Yellow
+                    'rgba(239, 68, 68, 0.8)',    // Red
+                    'rgba(139, 92, 246, 0.8)',   // Purple
+                    'rgba(14, 165, 233, 0.8)',   // Sky
+                    'rgba(236, 72, 153, 0.8)',   // Pink
                 ],
+                borderWidth: 2,
+                borderColor: 'white',
+                hoverOffset: 4
             },
         ],
     };
 
     const platformData = {
-        labels: filteredStats.platformStats.map(stat => stat.platform || 'Unknown'),
+        labels: filteredStats.platformStats.map(stat => stat.platform || t('common.unknown')),
         datasets: [
             {
                 data: filteredStats.platformStats.map(stat => stat.count),
                 backgroundColor: [
-                    'rgba(99, 102, 241, 0.8)',
-                    'rgba(16, 185, 129, 0.8)',
-                    'rgba(245, 158, 11, 0.8)',
-                    'rgba(239, 68, 68, 0.8)',
-                    'rgba(139, 92, 246, 0.8)',
+                    'rgba(99, 102, 241, 0.8)',   // Indigo
+                    'rgba(16, 185, 129, 0.8)',   // Green
+                    'rgba(245, 158, 11, 0.8)',   // Yellow
+                    'rgba(239, 68, 68, 0.8)',    // Red
+                    'rgba(139, 92, 246, 0.8)',   // Purple
+                    'rgba(14, 165, 233, 0.8)',   // Sky
                 ],
+                borderWidth: 2,
+                borderColor: 'white',
+                hoverOffset: 4
             },
         ],
-    };
-
-    const chartOptions = {
-        responsive: true,
-        plugins: {
-            legend: {
-                position: 'bottom',
-            },
-        },
-        scales: {
-            y: {
-                beginAtZero: true,
-                ticks: {
-                    precision: 0,
-                },
-            },
-        },
     };
 
     // Add console.log to debug the data
@@ -292,7 +424,7 @@ export default function Stats({ link, visits, countryStats, deviceStats, browser
         }),
         datasets: [
             {
-                label: 'QR Code Scans',
+                label: t('stats.qrCodeScans'),
                 data: qrCodeDailyStats.map(stat => stat.count),
                 borderColor: 'rgb(139, 92, 246)',
                 backgroundColor: 'rgba(139, 92, 246, 0.1)',
@@ -304,267 +436,207 @@ export default function Stats({ link, visits, countryStats, deviceStats, browser
 
     return (
         <AuthenticatedLayout>
-            <Head title={`Stats for ${link.name || 'Link'}`} />
+            <Head title={t('stats.overview')} />
 
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
                     <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                        <div className="p-6">
-                            {/* Header with back button and link info */}
-                            <div className="flex items-center justify-between mb-8">
+                        <div className="p-6 text-gray-900">
+                            <div className="flex items-center justify-between mb-6">
+                                <button
+                                    onClick={() => window.history.back()}
+                                    className="flex items-center text-gray-600 hover:text-gray-900"
+                                >
+                                    <span className="mr-2">←</span>
+                                    {t('common.back')}
+                                </button>
                                 <div className="flex items-center space-x-4">
                                     <button
-                                        onClick={() => window.history.back()}
-                                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                                        onClick={() => handleExport('csv', 'visits')}
+                                        disabled={exporting}
+                                        className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                                     >
-                                        <FaArrowLeft className="mr-2 h-4 w-4" />
-                                        Back
+                                        {t('stats.exportCsv')}
                                     </button>
-                                    <div>
-                                        <h1 className="text-2xl font-bold text-gray-900">
-                                            {link.name || 'Unnamed Link'}
-                                        </h1>
-                                        <p className="text-sm text-gray-500 truncate max-w-md">
-                                            {link.original}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center space-x-3">
-                                    <div className="flex items-center justify-between bg-gray-50 p-2 rounded-md">
-                                        <span className="text-gray-700 font-mono text-sm truncate mr-2">
-                                            {window.location.origin}/{link.code}
-                                        </span>
-                                        <button
-                                            className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                                            onClick={handleCopy}
-                                        >
-                                            {copied ? (
-                                                <>
-                                                    <FaCheck className="mr-1 h-3 w-3" />
-                                                    Copied
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <FaCopy className="mr-1 h-3 w-3" />
-                                                    Copy
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                    <a
-                                        href={link.original}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                    <button
+                                        onClick={() => handleExport('xlsx', 'visits')}
+                                        disabled={exporting}
+                                        className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                                     >
-                                        <FaExternalLinkAlt className="mr-2 h-4 w-4" />
-                                        Visit
-                                    </a>
+                                        {t('stats.exportExcel')}
+                                    </button>
                                 </div>
                             </div>
 
-                            {/* Date Range Filter */}
-                            <div className="flex items-center space-x-4 mb-6 bg-gray-50 p-4 rounded-lg">
-                                <div className="flex items-center">
-                                    <FaFilter className="text-gray-400 mr-2" />
-                                    <span className="text-gray-700 font-medium">Filter by Date:</span>
+                            <div className="flex items-center space-x-4 mb-6">
+                                <div className="flex-1">
+                                    <h1 className="text-2xl font-semibold text-gray-900">{link.original}</h1>
+                                    <div className="mt-1 flex items-center">
+                                        <span className="text-sm text-gray-500">{window.location.origin}/{link.code}</span>
+                                        <button
+                                            onClick={handleCopy}
+                                            className="ml-2 text-indigo-600 hover:text-indigo-900"
+                                        >
+                                            {copied ? t('common.copied') : t('common.copy')}
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="flex items-center space-x-2">
-                                    <div className="flex items-center">
-                                        <label htmlFor="startDate" className="mr-2 text-sm text-gray-600">From:</label>
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">{t('stats.filterByDate')}</label>
+                                <div className="flex space-x-4">
+                                    <div>
+                                        <label className="block text-xs text-gray-500">{t('common.from')}</label>
                                         <input
                                             type="date"
-                                            id="startDate"
                                             name="startDate"
                                             value={dateRange.startDate}
                                             onChange={handleDateChange}
-                                            className="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                                         />
                                     </div>
-                                    <div className="flex items-center">
-                                        <label htmlFor="endDate" className="mr-2 text-sm text-gray-600">To:</label>
+                                    <div>
+                                        <label className="block text-xs text-gray-500">{t('common.to')}</label>
                                         <input
                                             type="date"
-                                            id="endDate"
                                             name="endDate"
                                             value={dateRange.endDate}
                                             onChange={handleDateChange}
-                                            className="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                                         />
                                     </div>
                                 </div>
-                                {isLoading && (
-                                    <div className="flex items-center text-gray-500">
-                                        <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                        </svg>
-                                        Updating...
-                                    </div>
-                                )}
                             </div>
 
-                            {/* Export buttons */}
-                            <div className="flex justify-end space-x-2 mb-4">
-                                <button
-                                    onClick={() => handleExport('csv', 'visits')}
-                                    disabled={exporting || isLoading}
-                                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                                >
-                                    <FaDownload className="mr-2 h-4 w-4" />
-                                    Export CSV
-                                </button>
-                                <button
-                                    onClick={() => handleExport('xlsx', 'visits')}
-                                    disabled={exporting || isLoading}
-                                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
-                                >
-                                    <FaFileExport className="mr-2 h-4 w-4" />
-                                    Export Excel
-                                </button>
-                            </div>
-
-                            {/* Stats Overview Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.1 }}
-                                    className="bg-white border border-gray-200 rounded-lg shadow-sm p-6"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-medium text-gray-500">Total Visits</p>
-                                            <p className="text-3xl font-bold text-gray-900">{filteredStats.visits.length}</p>
-                                        </div>
-                                        <div className="bg-indigo-100 p-3 rounded-full">
-                                            <FaChartLine className="h-6 w-6 text-indigo-600" />
-                                        </div>
-                                    </div>
-                                </motion.div>
-
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.2 }}
-                                    className="bg-white border border-gray-200 rounded-lg shadow-sm p-6"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-medium text-gray-500">Countries</p>
-                                            <p className="text-3xl font-bold text-gray-900">{filteredStats.countryStats.length}</p>
-                                        </div>
-                                        <div className="bg-emerald-100 p-3 rounded-full">
-                                            <FaGlobe className="h-6 w-6 text-emerald-600" />
-                                        </div>
-                                    </div>
-                                </motion.div>
-
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.3 }}
-                                    className="bg-white border border-gray-200 rounded-lg shadow-sm p-6"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-medium text-gray-500">Device Types</p>
-                                            <p className="text-3xl font-bold text-gray-900">{filteredStats.deviceStats.length}</p>
-                                        </div>
-                                        <div className="bg-amber-100 p-3 rounded-full">
-                                            <FaMobile className="h-6 w-6 text-amber-600" />
-                                        </div>
-                                    </div>
-                                </motion.div>
-
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.4 }}
-                                    className="bg-white border border-gray-200 rounded-lg shadow-sm p-6"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-medium text-gray-500">Avg. Time Spent</p>
-                                            <p className="text-3xl font-bold text-gray-900">{Math.round(filteredStats.avgTimeSpent)}s</p>
-                                        </div>
-                                        <div className="bg-purple-100 p-3 rounded-full">
-                                            <FaClock className="h-6 w-6 text-purple-600" />
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            </div>
-
-                            {/* Tabs for different views */}
-                            <div className="mb-6">
-                                <div className="border-b border-gray-200">
-                                    <nav className="-mb-px flex space-x-8">
-                                        <button
-                                            onClick={() => setActiveTab('overview')}
-                                            className={`${
-                                                activeTab === 'overview'
-                                                    ? 'border-indigo-500 text-indigo-600'
-                                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-                                        >
-                                            Overview
-                                        </button>
-                                        <button
-                                            onClick={() => setActiveTab('daily')}
-                                            className={`${
-                                                activeTab === 'daily'
-                                                    ? 'border-indigo-500 text-indigo-600'
-                                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-                                        >
-                                            Daily Visits
-                                        </button>
-                                        <button
-                                            onClick={() => setActiveTab('countries')}
-                                            className={`${
-                                                activeTab === 'countries'
-                                                    ? 'border-indigo-500 text-indigo-600'
-                                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-                                        >
-                                            Countries
-                                        </button>
-                                        <button
-                                            onClick={() => setActiveTab('devices')}
-                                            className={`${
-                                                activeTab === 'devices'
-                                                    ? 'border-indigo-500 text-indigo-600'
-                                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-                                        >
-                                            Devices
-                                        </button>
-                                        <button
-                                            onClick={() => setActiveTab('qr-code')}
-                                            className={`${
-                                                activeTab === 'qr-code'
-                                                    ? 'border-indigo-500 text-indigo-600'
-                                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
-                                        >
-                                            <FaQrcode className="mr-2" />
-                                            QR Code
-                                        </button>
-                                    </nav>
-                                </div>
-                            </div>
-
-                            {/* Tab Content */}
-                            <div className="mt-6">
-                                {activeTab === 'overview' && (
-                                    <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                            <div className="border-b border-gray-200 mb-6">
+                                <nav className="-mb-px flex space-x-8">
+                                    <button
+                                        onClick={() => setActiveTab('overview')}
+                                        className={`${
+                                            activeTab === 'overview'
+                                                ? 'border-indigo-500 text-indigo-600'
+                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                        } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                                     >
-                                        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
-                                            <h3 className="text-lg font-medium text-gray-900 mb-4">Daily Visits</h3>
-                                            <div className="h-64">
+                                        {t('stats.overview')}
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('countries')}
+                                        className={`${
+                                            activeTab === 'countries'
+                                                ? 'border-indigo-500 text-indigo-600'
+                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                        } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                                    >
+                                        {t('stats.countries')}
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('devices')}
+                                        className={`${
+                                            activeTab === 'devices'
+                                                ? 'border-indigo-500 text-indigo-600'
+                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                        } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                                    >
+                                        {t('stats.devices')}
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('qrcode')}
+                                        className={`${
+                                            activeTab === 'qrcode'
+                                                ? 'border-indigo-500 text-indigo-600'
+                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                        } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                                    >
+                                        {t('stats.qrCode')}
+                                    </button>
+                                </nav>
+                            </div>
+
+                            {activeTab === 'overview' && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                >
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.1 }}
+                                            className="bg-white border border-gray-200 rounded-lg shadow-sm p-6"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-500">{t('stats.totalVisits')}</p>
+                                                    <p className="text-3xl font-bold text-gray-900">{filteredStats.visits.length}</p>
+                                                </div>
+                                                <div className="bg-indigo-100 p-3 rounded-full">
+                                                    <FaChartLine className="h-6 w-6 text-indigo-600" />
+                                                </div>
+                                            </div>
+                                        </motion.div>
+
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.2 }}
+                                            className="bg-white border border-gray-200 rounded-lg shadow-sm p-6"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-500">{t('stats.countries')}</p>
+                                                    <p className="text-3xl font-bold text-gray-900">
+                                                        {filteredStats.countryStats.length}
+                                                    </p>
+                                                </div>
+                                                <div className="bg-green-100 p-3 rounded-full">
+                                                    <FaGlobe className="h-6 w-6 text-green-600" />
+                                                </div>
+                                            </div>
+                                        </motion.div>
+
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.3 }}
+                                            className="bg-white border border-gray-200 rounded-lg shadow-sm p-6"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-500">{t('stats.devices')}</p>
+                                                    <p className="text-3xl font-bold text-gray-900">
+                                                        {filteredStats.deviceStats.length}
+                                                    </p>
+                                                </div>
+                                                <div className="bg-yellow-100 p-3 rounded-full">
+                                                    <FaMobile className="h-6 w-6 text-yellow-600" />
+                                                </div>
+                                            </div>
+                                        </motion.div>
+
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.4 }}
+                                            className="bg-white border border-gray-200 rounded-lg shadow-sm p-6"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-500">{t('stats.avgTimeSpent')}</p>
+                                                    <p className="text-3xl font-bold text-gray-900">{filteredStats.avgTimeSpent}s</p>
+                                                </div>
+                                                <div className="bg-purple-100 p-3 rounded-full">
+                                                    <FaClock className="h-6 w-6 text-purple-600" />
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                        <div className="bg-white p-6 rounded-lg shadow-sm">
+                                            <h3 className="text-lg font-medium text-gray-900 mb-4">{t('stats.dailyVisits')}</h3>
+                                            <div className="h-80">
                                                 {isLoading ? (
                                                     <div className="flex items-center justify-center h-full">
                                                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -572,325 +644,171 @@ export default function Stats({ link, visits, countryStats, deviceStats, browser
                                                 ) : filteredStats.dailyStats.length > 0 ? (
                                                     <Line 
                                                         data={dailyData} 
-                                                        options={{
-                                                            ...chartOptions,
-                                                            scales: {
-                                                                y: {
-                                                                    beginAtZero: true,
-                                                                    ticks: {
-                                                                        precision: 0,
-                                                                        stepSize: 1
-                                                                    }
-                                                                }
-                                                            }
-                                                        }} 
+                                                        options={lineChartOptions} 
                                                     />
                                                 ) : (
                                                     <div className="flex items-center justify-center h-full text-gray-500">
-                                                        No visit data available for the selected date range
+                                                        {t('common.noResults')}
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
-                                            <h3 className="text-lg font-medium text-gray-900 mb-4">Top Countries</h3>
-                                            <div className="h-64">
-                                                <Doughnut data={countryData} options={chartOptions} />
+
+                                        <div className="bg-white p-6 rounded-lg shadow-sm">
+                                            <h3 className="text-lg font-medium text-gray-900 mb-4">{t('stats.geographicDistribution')}</h3>
+                                            <div className="h-80">
+                                                {isLoading ? (
+                                                    <div className="flex items-center justify-center h-full">
+                                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                                                    </div>
+                                                ) : filteredStats.countryStats && filteredStats.countryStats.length > 0 ? (
+                                                    <Doughnut 
+                                                        data={countryData} 
+                                                        options={doughnutChartOptions}
+                                                    />
+                                                ) : (
+                                                    <div className="flex items-center justify-center h-full text-gray-500">
+                                                        {t('common.noResults')}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
-                                    </motion.div>
-                                )}
-
-                                {activeTab === 'daily' && (
-                                    <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        className="bg-white border border-gray-200 rounded-lg shadow-sm p-6"
-                                    >
-                                        <h3 className="text-lg font-medium text-gray-900 mb-4">Daily Visit Trends</h3>
-                                        <div className="h-80">
-                                            {isLoading ? (
-                                                <div className="flex items-center justify-center h-full">
-                                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                                                </div>
-                                            ) : filteredStats.dailyStats.length > 0 ? (
-                                                <Line 
-                                                    data={dailyData} 
-                                                    options={{
-                                                        ...chartOptions,
-                                                        scales: {
-                                                            y: {
-                                                                beginAtZero: true,
-                                                                ticks: {
-                                                                    precision: 0,
-                                                                    stepSize: 1
-                                                                }
-                                                            }
-                                                        }
-                                                    }} 
-                                                />
-                                            ) : (
-                                                <div className="flex items-center justify-center h-full text-gray-500">
-                                                    No visit data available for the selected date range
-                                                </div>
-                                            )}
-                                        </div>
-                                    </motion.div>
-                                )}
-
-                                {activeTab === 'countries' && (
-                                    <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        className="bg-white border border-gray-200 rounded-lg shadow-sm p-6"
-                                    >
-                                        <h3 className="text-lg font-medium text-gray-900 mb-4">Visits by Country</h3>
-                                        <div className="h-80">
-                                            <Doughnut data={countryData} options={chartOptions} />
-                                        </div>
-                                    </motion.div>
-                                )}
-
-                                {activeTab === 'devices' && (
-                                    <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        className="bg-white border border-gray-200 rounded-lg shadow-sm p-6"
-                                    >
-                                        <h3 className="text-lg font-medium text-gray-900 mb-4">Visits by Device Type</h3>
-                                        <div className="h-80">
-                                            <Doughnut data={deviceData} options={chartOptions} />
-                                        </div>
-                                    </motion.div>
-                                )}
-
-                                {/* Add new charts for browser and platform stats */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                                    <div className="bg-white p-6 rounded-lg shadow-sm">
-                                        <h3 className="text-lg font-medium text-gray-900 mb-4">Browser Distribution</h3>
-                                        <Doughnut data={browserData} options={chartOptions} />
                                     </div>
-                                    <div className="bg-white p-6 rounded-lg shadow-sm">
-                                        <h3 className="text-lg font-medium text-gray-900 mb-4">Platform Distribution</h3>
-                                        <Doughnut data={platformData} options={chartOptions} />
-                                    </div>
-                                </div>
 
-                                {/* Enhanced Analytics Section */}
-                                {report && (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                                         <div className="bg-white p-6 rounded-lg shadow-sm">
-                                            <h3 className="text-lg font-medium text-gray-900 mb-4">Peak Hours</h3>
-                                            <div className="h-64">
-                                                <Bar
-                                                    data={{
-                                                        labels: Object.keys(report.peak_hours),
-                                                        datasets: [{
-                                                            label: 'Visits',
-                                                            data: Object.values(report.peak_hours),
-                                                            backgroundColor: 'rgba(99, 102, 241, 0.8)',
-                                                        }]
-                                                    }}
-                                                    options={{
-                                                        ...chartOptions,
-                                                        scales: {
-                                                            y: {
-                                                                beginAtZero: true,
-                                                                title: {
-                                                                    display: true,
-                                                                    text: 'Number of Visits'
-                                                                }
-                                                            },
-                                                            x: {
-                                                                title: {
-                                                                    display: true,
-                                                                    text: 'Hour of Day'
-                                                                }
-                                                            }
-                                                        }
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="bg-white p-6 rounded-lg shadow-sm">
-                                            <h3 className="text-lg font-medium text-gray-900 mb-4">Top Referrers</h3>
-                                            <div className="space-y-4">
-                                                {Object.entries(report.referrers).map(([url, count]) => (
-                                                    <div key={url} className="flex justify-between items-center">
-                                                        <span className="text-sm text-gray-600 truncate">{url || 'Direct'}</span>
-                                                        <span className="text-sm font-medium text-gray-900">{count}</span>
+                                            <h3 className="text-lg font-medium text-gray-900 mb-4">{t('stats.deviceDistribution')}</h3>
+                                            <div className="h-80">
+                                                {isLoading ? (
+                                                    <div className="flex items-center justify-center h-full">
+                                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
                                                     </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {activeTab === 'qr-code' && (
-                                    <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        className="space-y-6"
-                                    >
-                                        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
-                                            <div className="flex items-center justify-between mb-6">
-                                                <h3 className="text-lg font-medium text-gray-900">QR Code Management</h3>
-                                                <button
-                                                    onClick={handleToggleQrCode}
-                                                    disabled={qrCodeLoading}
-                                                    className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md ${
-                                                        link.qr_code_enabled
-                                                            ? 'text-red-700 bg-red-100 hover:bg-red-200'
-                                                            : 'text-green-700 bg-green-100 hover:bg-green-200'
-                                                    } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50`}
-                                                >
-                                                    {qrCodeLoading ? (
-                                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                                                    ) : link.qr_code_enabled ? (
-                                                        <>
-                                                            <FaToggleOn className="mr-2 h-5 w-5" />
-                                                            Disable QR Code
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <FaToggleOff className="mr-2 h-5 w-5" />
-                                                            Enable QR Code
-                                                        </>
-                                                    )}
-                                                </button>
-                                            </div>
-
-                                            {qrCodeError && (
-                                                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-                                                    <p className="text-sm text-red-600">{qrCodeError}</p>
-                                                </div>
-                                            )}
-
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                <div className="space-y-4">
-                                                    <div className="bg-gray-50 p-4 rounded-lg">
-                                                        <h4 className="text-sm font-medium text-gray-500 mb-2">Status</h4>
-                                                        <p className="text-lg font-semibold text-gray-900">
-                                                            {link.qr_code_enabled ? 'Enabled' : 'Disabled'}
-                                                        </p>
-                                                    </div>
-                                                    
-                                                    {link.qr_code_enabled && (
-                                                        <>
-                                                            <div className="bg-gray-50 p-4 rounded-lg">
-                                                                <h4 className="text-sm font-medium text-gray-500 mb-2">QR Code Style</h4>
-                                                                <p className="text-lg font-semibold text-gray-900">
-                                                                    {link.qr_code_style || 'Default'}
-                                                                </p>
-                                                            </div>
-                                                            <div className="bg-gray-50 p-4 rounded-lg">
-                                                                <h4 className="text-sm font-medium text-gray-500 mb-2">Total Scans</h4>
-                                                                <p className="text-lg font-semibold text-gray-900">
-                                                                    {qrCodeStats.total}
-                                                                </p>
-                                                            </div>
-                                                            <div className="bg-gray-50 p-4 rounded-lg">
-                                                                <h4 className="text-sm font-medium text-gray-500 mb-2">Usage Percentage</h4>
-                                                                <p className="text-lg font-semibold text-gray-900">
-                                                                    {qrCodeStats.percentage}% of total visits
-                                                                </p>
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </div>
-
-                                                {link.qr_code_enabled && (
-                                                    <div className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-lg">
-                                                        {link.qr_code_url ? (
-                                                            <>
-                                                                <img
-                                                                    src={link.qr_code_url}
-                                                                    alt="QR Code"
-                                                                    className="w-48 h-48 mb-4"
-                                                                />
-                                                                <div className="flex space-x-2">
-                                                                    <a
-                                                                        href={link.qr_code_url}
-                                                                        download={`qr-code-${link.id}.png`}
-                                                                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                                                                    >
-                                                                        <FaDownload className="mr-2" />
-                                                                        Download
-                                                                    </a>
-                                                                    <button
-                                                                        onClick={() => handleGenerateQrCode(true)}
-                                                                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                                                                    >
-                                                                        <FaSync className="mr-2" />
-                                                                        Regenerate
-                                                                    </button>
-                                                                </div>
-                                                            </>
-                                                        ) : (
-                                                            <button
-                                                                onClick={handleGenerateQrCode}
-                                                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                                                            >
-                                                                <FaQrcode className="mr-2" />
-                                                                Generate QR Code
-                                                            </button>
-                                                        )}
+                                                ) : filteredStats.deviceStats && filteredStats.deviceStats.length > 0 ? (
+                                                    <Doughnut 
+                                                        data={deviceData} 
+                                                        options={doughnutChartOptions}
+                                                    />
+                                                ) : (
+                                                    <div className="flex items-center justify-center h-full text-gray-500">
+                                                        {t('common.noResults')}
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
 
-                                        {link.qr_code_enabled && qrCodeDailyStats.length > 0 && (
-                                            <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
-                                                <h3 className="text-lg font-medium text-gray-900 mb-4">QR Code Scan History</h3>
+                                        <div className="bg-white p-6 rounded-lg shadow-sm">
+                                            <h3 className="text-lg font-medium text-gray-900 mb-4">{t('stats.browserDistribution')}</h3>
+                                            <div className="h-80">
+                                                {isLoading ? (
+                                                    <div className="flex items-center justify-center h-full">
+                                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                                                    </div>
+                                                ) : filteredStats.browserStats.length > 0 ? (
+                                                    <Doughnut 
+                                                        data={browserData} 
+                                                        options={doughnutChartOptions}
+                                                    />
+                                                ) : (
+                                                    <div className="flex items-center justify-center h-full text-gray-500">
+                                                        {t('common.noResults')}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                        <div className="bg-white p-6 rounded-lg shadow-sm">
+                                            <h3 className="text-lg font-medium text-gray-900 mb-4">{t('stats.platformDistribution')}</h3>
+                                            <div className="h-80">
+                                                {isLoading ? (
+                                                    <div className="flex items-center justify-center h-full">
+                                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                                                    </div>
+                                                ) : filteredStats.platformStats.length > 0 ? (
+                                                    <Doughnut 
+                                                        data={platformData} 
+                                                        options={doughnutChartOptions}
+                                                    />
+                                                ) : (
+                                                    <div className="flex items-center justify-center h-full text-gray-500">
+                                                        {t('common.noResults')}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {report && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                            <div className="bg-white p-6 rounded-lg shadow-sm">
+                                                <h3 className="text-lg font-medium text-gray-900 mb-4">{t('stats.peakHours')}</h3>
                                                 <div className="h-64">
-                                                    {isLoading ? (
-                                                        <div className="flex items-center justify-center h-full">
-                                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                                                        </div>
-                                                    ) : (
-                                                        <Line 
-                                                            data={qrCodeData} 
-                                                            options={{
-                                                                ...chartOptions,
-                                                                scales: {
-                                                                    y: {
-                                                                        beginAtZero: true,
-                                                                        ticks: {
-                                                                            precision: 0,
-                                                                            stepSize: 1
-                                                                        }
+                                                    <Bar
+                                                        data={{
+                                                            labels: Object.keys(report.peak_hours),
+                                                            datasets: [{
+                                                                label: t('stats.visits'),
+                                                                data: Object.values(report.peak_hours),
+                                                                backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                                                            }]
+                                                        }}
+                                                        options={{
+                                                            ...lineChartOptions,
+                                                            scales: {
+                                                                y: {
+                                                                    beginAtZero: true,
+                                                                    title: {
+                                                                        display: true,
+                                                                        text: t('stats.visits')
+                                                                    }
+                                                                },
+                                                                x: {
+                                                                    title: {
+                                                                        display: true,
+                                                                        text: t('stats.hourOfDay')
                                                                     }
                                                                 }
-                                                            }} 
-                                                        />
-                                                    )}
+                                                            }
+                                                        }}
+                                                    />
                                                 </div>
                                             </div>
-                                        )}
-                                    </motion.div>
-                                )}
-                            </div>
+
+                                            <div className="bg-white p-6 rounded-lg shadow-sm">
+                                                <h3 className="text-lg font-medium text-gray-900 mb-4">{t('stats.topReferrers')}</h3>
+                                                <div className="space-y-4">
+                                                    {Object.entries(report.referrers || {}).map(([referrer, count], index) => (
+                                                        <div key={index} className="flex items-center justify-between">
+                                                            <span className="text-sm text-gray-600 truncate flex-1">{referrer}</span>
+                                                            <span className="text-sm font-medium text-gray-900">{count}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </motion.div>
+                            )}
 
                             {/* Recent Visits Table */}
                             <div className="mt-8">
-                                <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Visits</h3>
+                                <h3 className="text-lg font-medium text-gray-900 mb-4">{t('stats.recentVisits')}</h3>
                                 <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
                                     <table className="min-w-full divide-y divide-gray-200">
                                         <thead className="bg-gray-50">
                                             <tr>
                                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Date
+                                                    {t('stats.date')}
                                                 </th>
                                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Country
+                                                    {t('stats.country')}
                                                 </th>
                                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Device
+                                                    {t('stats.device')}
                                                 </th>
                                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    IP Address
+                                                    {t('stats.ipAddress')}
                                                 </th>
                                             </tr>
                                         </thead>
@@ -901,7 +819,7 @@ export default function Stats({ link, visits, countryStats, deviceStats, browser
                                                         {new Date(visit.visited_at).toLocaleString()}
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        {visit.country || 'Unknown'}
+                                                        {visit.country || t('common.unknown')}
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                         {visit.device}
