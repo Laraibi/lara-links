@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class SetLocale
@@ -15,43 +16,60 @@ class SetLocale
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // First check session
-        if (Session::has('locale')) {
-            $locale = Session::get('locale');
-        }
-        // Then check cookie
-        else if ($request->hasCookie('locale')) {
-            $locale = $request->cookie('locale');
-            // Store in session for future requests
-            Session::put('locale', $locale);
-        }
-        // Finally check Accept-Language header
-        else {
-            $locale = $request->getPreferredLanguage(['en', 'fr']);
-            // Store in both session and cookie
-            Session::put('locale', $locale);
-            cookie()->queue('locale', $locale, 60 * 24 * 365); // 1 year
+        // Log initial state
+        Log::debug('SetLocale middleware - Initial state', [
+            'path' => $request->path(),
+            'cookie' => $request->cookie('locale'),
+            'session' => $request->session()->get('locale'),
+            'current_locale' => app()->getLocale(),
+            'isStatsPage' => str_contains($request->path(), '/links/stats')
+        ]);
+
+        // Get locale from cookie first
+        $locale = $request->cookie('locale');
+
+        // If no cookie, check session
+        if (!$locale) {
+            $locale = $request->session()->get('locale');
         }
 
-        // Ensure locale is valid
+        // If no session, check browser preference
+        if (!$locale) {
+            $locale = $request->getPreferredLanguage(['en', 'fr']);
+        }
+
+        // Validate locale
         if (!in_array($locale, ['en', 'fr'])) {
             $locale = 'en';
-            Session::put('locale', $locale);
-            cookie()->queue('locale', $locale, 60 * 24 * 365); // 1 year
+            Log::warning('Invalid locale detected, defaulting to English', [
+                'original_locale' => $locale,
+                'path' => $request->path()
+            ]);
         }
 
         // Set the application locale
-        App::setLocale($locale);
+        app()->setLocale($locale);
 
-        // Set cookie if not already set
-        if (!$request->hasCookie('locale')) {
-            cookie()->queue('locale', $locale, 60 * 24 * 365); // 1 year
+        // Store in session if not already set
+        if (!$request->session()->has('locale')) {
+            $request->session()->put('locale', $locale);
         }
 
-        // Set the locale in the response
-        $response = $next($request);
-        $response->headers->set('Content-Language', $locale);
+        // Set cookie if not already set
+        if (!$request->cookie('locale')) {
+            $response = $next($request);
+            return $response->withCookie(cookie('locale', $locale, 60 * 24 * 365, '/', null, true, true, false, 'Lax'));
+        }
 
-        return $response;
+        // Log final state
+        Log::debug('SetLocale middleware - Final state', [
+            'locale' => $locale,
+            'cookie' => $request->cookie('locale'),
+            'session' => $request->session()->get('locale'),
+            'path' => $request->path(),
+            'isStatsPage' => str_contains($request->path(), '/links/stats')
+        ]);
+
+        return $next($request);
     }
 } 

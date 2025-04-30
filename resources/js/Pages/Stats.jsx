@@ -111,27 +111,6 @@ export default function Stats({ auth, link, visits, countryStats, deviceStats, b
         ],
     };
 
-    // Add debugging logs for data and chart rendering
-    useEffect(() => {
-        console.log('Stats Data:', {
-            deviceStats,
-            countryStats,
-            filteredStats,
-            chartData: {
-                deviceData,
-                countryData
-            }
-        });
-    }, [deviceStats, countryStats, filteredStats, deviceData, countryData]);
-
-    // Add effect to ensure language persistence
-    useEffect(() => {
-        const storedLanguage = localStorage.getItem('i18nextLng');
-        if (storedLanguage && storedLanguage !== i18n.language) {
-            i18n.changeLanguage(storedLanguage);
-        }
-    }, []);
-
     // Add effect to update translations when language changes
     useEffect(() => {
         const handleLanguageChange = () => {
@@ -335,11 +314,6 @@ export default function Stats({ auth, link, visits, countryStats, deviceStats, b
         ],
     };
 
-    // Add debugging for device data
-    useEffect(() => {
-        console.log('Device Data:', deviceData);
-    }, [deviceData]);
-
     const browserData = {
         labels: filteredStats.browserStats.map(stat => stat.browser || t('common.unknown')),
         datasets: [
@@ -380,11 +354,6 @@ export default function Stats({ auth, link, visits, countryStats, deviceStats, b
             },
         ],
     };
-
-    // Add console.log to debug the data
-    useEffect(() => {
-        console.log('Daily Stats:', filteredStats.dailyStats);
-    }, [filteredStats.dailyStats]);
 
     const handleToggleQrCode = async () => {
         setQrCodeLoading(true);

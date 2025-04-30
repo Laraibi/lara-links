@@ -1,111 +1,87 @@
-import i18n from 'i18next';
+import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
+import Backend from 'i18next-http-backend';
+import Cookies from 'js-cookie';
 
-// Import translations
+// Import translation files
 import enTranslations from './locales/en/translations.json';
 import frTranslations from './locales/fr/translations.json';
 
-const resources = {
-  en: {
-    translation: enTranslations,
-  },
-  fr: {
-    translation: frTranslations,
-  },
-};
-
-// Function to get initial language from various sources
+// Function to get initial language
 const getInitialLanguage = () => {
-  try {
-    // First check cookie
-    const cookies = document.cookie.split(';');
-    const localeCookie = cookies.find(cookie => cookie.trim().startsWith('locale='));
-    if (localeCookie) {
-      const cookieValue = localeCookie.split('=')[1].trim();
-      if (['en', 'fr'].includes(cookieValue)) {
-        return cookieValue;
-      }
+    // Check Inertia page props first
+    const pageProps = window.__INERTIA_PROPS__;
+    if (pageProps?.locale) {
+        return pageProps.locale;
     }
 
-    // Then check HTML lang attribute
+    // Check cookie
+    const cookieLang = Cookies.get('locale');
+    if (cookieLang) {
+        return cookieLang;
+    }
+
+    // Check HTML lang attribute
     const htmlLang = document.documentElement.lang;
-    if (htmlLang && ['en', 'fr'].includes(htmlLang)) {
-      return htmlLang;
+    if (htmlLang) {
+        return htmlLang;
     }
 
-    // Finally check browser language
+    // Check browser language
     const browserLang = navigator.language.split('-')[0];
-    if (['en', 'fr'].includes(browserLang)) {
-      return browserLang;
+    if (browserLang) {
+        return browserLang;
     }
 
     // Default to English
     return 'en';
-  } catch (error) {
-    console.warn('Error getting initial language:', error);
-    return 'en';
-  }
 };
 
-i18n
-  .use(LanguageDetector)
-  .use(initReactI18next)
-  .init({
-    resources,
-    lng: getInitialLanguage(),
-    fallbackLng: 'en',
-    supportedLngs: ['en', 'fr'],
-    debug: process.env.NODE_ENV === 'development',
-    interpolation: {
-      escapeValue: false,
-    },
-    detection: {
-      order: ['cookie', 'navigator'],
-      caches: ['cookie'],
-      lookupCookie: 'locale',
-      cookieMinutes: 60 * 24 * 365, // 1 year
-    },
-    react: {
-      useSuspense: false
-    }
-  });
+// Initialize i18next
+i18next
+    .use(Backend)
+    .use(LanguageDetector)
+    .use(initReactI18next)
+    .init({
+        resources: {
+            en: { translation: enTranslations },
+            fr: { translation: frTranslations }
+        },
+        lng: getInitialLanguage(),
+        fallbackLng: 'en',
+        interpolation: {
+            escapeValue: false
+        },
+        detection: {
+            order: ['cookie', 'htmlTag', 'navigator'],
+            caches: ['cookie'],
+            cookieOptions: {
+                path: '/',
+                sameSite: 'lax',
+                secure: true,
+                httpOnly: false
+            }
+        }
+    });
 
-// Sync language changes across storage mechanisms
-i18n.on('languageChanged', (lng) => {
-  try {
-    // Update cookie
-    document.cookie = `locale=${lng};path=/;max-age=${60 * 24 * 365}`;
-    
-    // Update HTML lang attribute
+// Handle language changes
+i18next.on('languageChanged', (lng) => {
     document.documentElement.lang = lng;
-  } catch (error) {
-    console.warn('Error syncing language:', error);
-  }
+    Cookies.set('locale', lng, {
+        path: '/',
+        sameSite: 'lax',
+        secure: true,
+        httpOnly: false
+    });
 });
 
 // Handle Inertia page visits
-document.addEventListener('inertia:before', (event) => {
-  try {
-    const cookies = document.cookie.split(';');
-    const localeCookie = cookies.find(cookie => cookie.trim().startsWith('locale='));
-    if (localeCookie) {
-      const locale = localeCookie.split('=')[1].trim();
-      if (locale && locale !== i18n.language) {
-        i18n.changeLanguage(locale);
-      }
-    }
-  } catch (error) {
-    console.warn('Could not restore language preference:', error);
-  }
-});
-
-// Update i18n language when the page props locale changes
 document.addEventListener('inertia:success', (event) => {
-  const locale = event.detail.page.props.locale;
-  if (locale && locale !== i18n.language) {
-    i18n.changeLanguage(locale);
-  }
+    const pageProps = event.detail.page.props;
+    if (pageProps?.locale && pageProps.locale !== i18next.language) {
+        i18next.changeLanguage(pageProps.locale);
+    }
 });
 
-export default i18n; 
+export default i18next; 

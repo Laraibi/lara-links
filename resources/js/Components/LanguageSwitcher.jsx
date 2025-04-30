@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { router } from '@inertiajs/react';
+import { usePage } from '@inertiajs/react';
 
 const LanguageSwitcher = () => {
   const { i18n } = useTranslation();
+  const { props } = usePage();
   const [isOpen, setIsOpen] = useState(false);
   const [currentLang, setCurrentLang] = useState(i18n.language);
   const [isChanging, setIsChanging] = useState(false);
@@ -20,22 +22,13 @@ const LanguageSwitcher = () => {
     };
   }, [i18n]);
 
-  // Sync with cookie on mount
+  // Sync with page props locale
   useEffect(() => {
-    try {
-      const cookies = document.cookie.split(';');
-      const localeCookie = cookies.find(cookie => cookie.trim().startsWith('locale='));
-      if (localeCookie) {
-        const locale = localeCookie.split('=')[1].trim();
-        if (locale && locale !== currentLang) {
-          setCurrentLang(locale);
-          i18n.changeLanguage(locale);
-        }
-      }
-    } catch (error) {
-      console.warn('Could not read language from cookie:', error);
+    if (props.locale && props.locale !== currentLang) {
+      setCurrentLang(props.locale);
+      i18n.changeLanguage(props.locale);
     }
-  }, []);
+  }, [props.locale]);
 
   const languages = [
     { code: 'en', name: 'English', flag: '🇬🇧' },
@@ -75,7 +68,7 @@ const LanguageSwitcher = () => {
   };
 
   return (
-    <div className="relative inline-block text-left">
+    <div className="relative">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}

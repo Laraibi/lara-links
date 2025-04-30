@@ -4,46 +4,59 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class LanguageController extends Controller
 {
-    public function switch(Request $request, $locale)
+    public function switch(Request $request, string $locale)
     {
+        Log::info('Language switch requested', [
+            'requested_locale' => $locale,
+            'current_locale' => App::getLocale(),
+            'cookie_locale' => $request->cookie('locale'),
+            'session_locale' => Session::get('locale'),
+            'url' => $request->fullUrl()
+        ]);
+
         // Validate locale
         if (!in_array($locale, ['en', 'fr'])) {
-            $locale = 'en';
+            Log::warning('Invalid locale requested', ['locale' => $locale]);
+            return back()->with('error', 'Invalid language selected.');
         }
 
-        // Set the locale in the session
+        // Set locale in session
         Session::put('locale', $locale);
         
-        // Set the application locale
+        // Set locale in cookie
+        $cookie = cookie('locale', $locale, 60 * 24 * 365, '/', null, true, true); // 1 year, secure, httpOnly
+        
+        // Set application locale
         App::setLocale($locale);
 
-        // Get the current page data from the request header
-        $page = $request->header('X-Inertia-Page');
-        
-        if ($page) {
+        Log::info('Language switch completed', [
+            'new_locale' => $locale,
+            'session_set' => Session::has('locale'),
+            'cookie_set' => $request->hasCookie('locale')
+        ]);
+
+        // Handle Inertia requests
+        if ($request->header('X-Inertia')) {
+            $page = $request->header('X-Inertia-Page');
             try {
                 $pageData = json_decode($page, true);
-                
-                if ($pageData && isset($pageData['component']) && isset($pageData['props'])) {
-                    // Return an Inertia response with the current page data
+                if ($pageData && isset($pageData['component'])) {
                     return Inertia::render($pageData['component'], [
                         'locale' => $locale,
-                        ...$pageData['props']
-                    ])->withCookie(cookie('locale', $locale, 60 * 24 * 365)); // 1 year
+                        ...($pageData['props'] ?? [])
+                    ])->withCookie($cookie);
                 }
             } catch (\Exception $e) {
-                // Log the error but continue with redirect
                 Log::error('Error parsing Inertia page data: ' . $e->getMessage());
             }
         }
 
-        // If we can't get the page data, redirect back to the previous page
-        return redirect()->back()->withCookie(cookie('locale', $locale, 60 * 24 * 365)); // 1 year
+        return back()->withCookie($cookie);
     }
 } 
