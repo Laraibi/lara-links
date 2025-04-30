@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { FaDownload, FaSync } from "react-icons/fa";
 import axios from "axios";
 import { router } from '@inertiajs/react';
+import { useTranslation } from 'react-i18next';
 
 export default function QrCodeModal({
     isOpen,
@@ -9,6 +10,7 @@ export default function QrCodeModal({
     link,
     onQrCodeGenerated,
 }) {
+    const { t } = useTranslation();
     const [qrCodeUrl, setQrCodeUrl] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -45,7 +47,7 @@ export default function QrCodeModal({
                 // No QR code exists yet, which is fine
                 setQrCodeUrl(null);
             } else {
-                setError("Failed to check for existing QR code");
+                setError(t('links.qrCodeCheckError'));
                 console.error("Failed to check for existing QR code:", error);
             }
         } finally {
@@ -71,7 +73,7 @@ export default function QrCodeModal({
                 onQrCodeGenerated(newQrCodeUrl);
             }
         } catch (error) {
-            setError("Failed to generate QR code");
+            setError(t('links.qrCodeGenerateError'));
             console.error("Failed to generate QR code:", error);
         } finally {
             setIsLoading(false);
@@ -96,7 +98,7 @@ export default function QrCodeModal({
             <div className="bg-white rounded-lg p-6 max-w-md w-full">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-semibold">
-                        QR Code for {link.name}
+                        {t('links.qrCodeFor', { name: link.name })}
                     </h2>
                     <button
                         onClick={onClose}
@@ -116,14 +118,14 @@ export default function QrCodeModal({
                     <div className="py-8 text-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
                         <p className="mt-2 text-gray-600">
-                            Generating QR code...
+                            {t('links.generatingQrCode')}
                         </p>
                     </div>
                 ) : qrCodeUrl ? (
                     <div className="mt-4">
                         <img
                             src={qrCodeUrl}
-                            alt="QR Code"
+                            alt={t('links.qrCode')}
                             className="w-48 h-48 mb-4 mx-auto"
                         />
                         <div className="flex justify-center space-x-4">
@@ -132,14 +134,14 @@ export default function QrCodeModal({
                                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                             >
                                 <FaDownload className="mr-2" />
-                                Download QR Code
+                                {t('links.downloadQrCode')}
                             </button>
                             <button
                                 onClick={() => generateQrCode(true)}
                                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                             >
                                 <FaSync className="mr-2" />
-                                Regenerate
+                                {t('links.regenerateQrCode')}
                             </button>
                         </div>
                     </div>
@@ -149,7 +151,7 @@ export default function QrCodeModal({
                             onClick={() => generateQrCode()}
                             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                         >
-                            Generate QR Code
+                            {t('links.generateQrCode')}
                         </button>
                     </div>
                 )}

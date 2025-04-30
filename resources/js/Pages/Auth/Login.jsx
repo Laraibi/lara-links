@@ -7,8 +7,11 @@ import TextInput from "@/Components/TextInput";
 import GuestLayout from "@/Layouts/GuestLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
 import { FaLink, FaUser } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from '@/Components/LanguageSwitcher';
 
 export default function Login({ status, canResetPassword }) {
+    const { t } = useTranslation();
     const { data, setData, post, processing, errors, reset } = useForm({
         email: "",
         password: "",
@@ -46,7 +49,7 @@ export default function Login({ status, canResetPassword }) {
 
     return (
         <GuestLayout>
-            <Head title="Log in" />
+            <Head title={t('auth.login')} />
 
             {status && (
                 <div className="mb-4 font-medium text-sm text-green-600">
@@ -54,19 +57,23 @@ export default function Login({ status, canResetPassword }) {
                 </div>
             )}
 
+            <div className="absolute top-4 right-4">
+                <LanguageSwitcher />
+            </div>
+
             <div className="mb-8 text-center">
                 <div className="flex justify-center mb-4">
                     <FaLink className="h-12 w-12 text-indigo-600" />
                 </div>
                 <h1 className="text-2xl font-bold text-gray-800">LaraLinks</h1>
                 <p className="mt-2 text-gray-600">
-                    Create, manage, and track your shortened links with ease
+                    {t('common.appDescription')}
                 </p>
             </div>
 
             <form onSubmit={submit}>
                 <div>
-                    <InputLabel htmlFor="email" value="Email" />
+                    <InputLabel htmlFor="email" value={t('auth.email')} />
 
                     <TextInput
                         id="email"
@@ -83,7 +90,7 @@ export default function Login({ status, canResetPassword }) {
                 </div>
 
                 <div className="mt-4">
-                    <InputLabel htmlFor="password" value="Password" />
+                    <InputLabel htmlFor="password" value={t('auth.password')} />
 
                     <TextInput
                         id="password"
@@ -108,7 +115,7 @@ export default function Login({ status, canResetPassword }) {
                             }
                         />
                         <span className="ml-2 text-sm text-gray-600">
-                            Remember me
+                            {t('auth.rememberMe')}
                         </span>
                     </label>
                 </div>
@@ -119,7 +126,7 @@ export default function Login({ status, canResetPassword }) {
                             href={route("password.request")}
                             className="text-sm text-indigo-600 hover:text-indigo-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                         >
-                            Forgot your password?
+                            {t('auth.forgotPassword')}
                         </Link>
                     )}
 
@@ -127,7 +134,7 @@ export default function Login({ status, canResetPassword }) {
                         href={route("register")}
                         className="text-sm text-indigo-600 hover:text-indigo-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                     >
-                        Need an account?
+                        {t('auth.needAccount')}
                     </Link>
                 </div>
 
@@ -137,7 +144,7 @@ export default function Login({ status, canResetPassword }) {
                         className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                         disabled={processing}
                     >
-                        Log in
+                        {t('auth.login')}
                     </button>
                 </div>
             </form>
@@ -148,7 +155,7 @@ export default function Login({ status, canResetPassword }) {
                         <div className="w-full border-t border-gray-300"></div>
                     </div>
                     <div className="relative flex justify-center text-sm">
-                        <span className="px-2 bg-white text-gray-500">Or</span>
+                        <span className="px-2 bg-white text-gray-500">{t('common.or')}</span>
                     </div>
                 </div>
 
@@ -160,7 +167,7 @@ export default function Login({ status, canResetPassword }) {
                         disabled={processing}
                     >
                         <FaUser className="mr-2 h-4 w-4 text-indigo-500" />
-                        Login as Demo User
+                        {t('auth.loginAsDemo')}
                     </button>
                 </div>
             </div>

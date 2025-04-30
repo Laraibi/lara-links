@@ -14,13 +14,16 @@
     "profile": "Profil",
     "back": "Retour",
     "copy": "Copier",
-    "copied": "Copié",
+    "copied": "Copié dans le presse-papiers !",
     "stats": "Statistiques",
     "export": "Exporter",
     "filter": "Filtrer",
     "from": "De",
     "to": "À",
-    "unknown": "Inconnu"
+    "unknown": "Inconnu",
+    "or": "Ou",
+    "close": "Terminé",
+    "appDescription": "Créez, gérez et suivez vos liens raccourcis en toute simplicité"
   },
   "auth": {
     "login": "Connexion",
@@ -29,11 +32,36 @@
     "email": "Email",
     "password": "Mot de passe",
     "rememberMe": "Se souvenir de moi",
-    "forgotPassword": "Mot de passe oublié ?"
+    "forgotPassword": "Mot de passe oublié ?",
+    "needAccount": "Besoin d'un compte ?",
+    "loginAsDemo": "Connexion en tant qu'utilisateur démo"
+  },
+  "profile": {
+    "title": "Profil",
+    "information": "Informations du profil",
+    "informationSubtext": "Mettez à jour les informations de votre profil et votre adresse e-mail.",
+    "name": "Nom",
+    "email": "Email",
+    "unverifiedEmail": "Votre adresse e-mail n'est pas vérifiée.",
+    "resendVerification": "Cliquez ici pour renvoyer l'e-mail de vérification.",
+    "verificationSent": "Un nouveau lien de vérification a été envoyé à votre adresse e-mail.",
+    "saved": "Enregistré.",
+    "save": "Enregistrer",
+    "updatePassword": "Mettre à jour le mot de passe",
+    "updatePasswordSubtext": "Assurez-vous que votre compte utilise un mot de passe long et aléatoire pour rester sécurisé.",
+    "currentPassword": "Mot de passe actuel",
+    "newPassword": "Nouveau mot de passe",
+    "confirmPassword": "Confirmer le mot de passe",
+    "deleteAccount": "Supprimer le compte",
+    "deleteAccountSubtext": "Une fois votre compte supprimé, toutes ses ressources et données seront définitivement supprimées. Avant de supprimer votre compte, veuillez télécharger les données ou informations que vous souhaitez conserver.",
+    "confirmDelete": "Êtes-vous sûr de vouloir supprimer votre compte ?"
   },
   "links": {
     "create": "Créer un lien",
     "createLink": "CRÉER UN LIEN",
+    "createSuccess": "Lien créé avec succès !",
+    "createError": "Échec de la création du lien. Veuillez réessayer.",
+    "copyError": "Échec de la copie du lien dans le presse-papiers.",
     "yourLinks": "Vos liens",
     "edit": "Modifier le lien",
     "delete": "Supprimer le lien",
@@ -57,7 +85,14 @@
     "visits": "visites",
     "created": "Créé",
     "noLinksFound": "Aucun lien trouvé.",
-    "searchLinks": "Rechercher des liens..."
+    "searchLinks": "Rechercher des liens...",
+    "qrCodeFor": "Code QR pour {{name}}",
+    "qrCode": "Code QR",
+    "regenerateQrCode": "Régénérer",
+    "downloadQrCode": "Télécharger le code QR",
+    "generatingQrCode": "Génération du code QR...",
+    "qrCodeCheckError": "Échec de la vérification du code QR existant",
+    "qrCodeGenerateError": "Échec de la génération du code QR"
   },
   "stats": {
     "totalVisits": "Visites totales",

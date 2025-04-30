@@ -14,13 +14,16 @@
     "profile": "Profile",
     "back": "Back",
     "copy": "Copy",
-    "copied": "Copied",
+    "copied": "Copied to clipboard!",
     "stats": "Statistics",
     "export": "Export",
     "filter": "Filter",
     "from": "From",
     "to": "To",
-    "unknown": "Unknown"
+    "unknown": "Unknown",
+    "or": "Or",
+    "close": "Done",
+    "appDescription": "Create, manage, and track your shortened links with ease"
   },
   "auth": {
     "login": "Login",
@@ -29,11 +32,36 @@
     "email": "Email",
     "password": "Password",
     "rememberMe": "Remember me",
-    "forgotPassword": "Forgot password?"
+    "forgotPassword": "Forgot password?",
+    "needAccount": "Need an account?",
+    "loginAsDemo": "Login as Demo User"
+  },
+  "profile": {
+    "title": "Profile",
+    "information": "Profile Information",
+    "informationSubtext": "Update your account's profile information and email address.",
+    "name": "Name",
+    "email": "Email",
+    "unverifiedEmail": "Your email address is unverified.",
+    "resendVerification": "Click here to re-send the verification email.",
+    "verificationSent": "A new verification link has been sent to your email address.",
+    "saved": "Saved.",
+    "save": "Save",
+    "updatePassword": "Update Password",
+    "updatePasswordSubtext": "Ensure your account is using a long, random password to stay secure.",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "deleteAccount": "Delete Account",
+    "deleteAccountSubtext": "Once your account is deleted, all of its resources and data will be permanently deleted. Before deleting your account, please download any data or information that you wish to retain.",
+    "confirmDelete": "Are you sure you want to delete your account?"
   },
   "links": {
     "create": "Create Link",
     "createLink": "CREATE LINK",
+    "createSuccess": "Link created successfully!",
+    "createError": "Failed to create link. Please try again.",
+    "copyError": "Failed to copy link to clipboard.",
     "yourLinks": "Your Links",
     "edit": "Edit Link",
     "delete": "Delete Link",
@@ -57,7 +85,14 @@
     "visits": "visits",
     "created": "Created",
     "noLinksFound": "No links found.",
-    "searchLinks": "Search links..."
+    "searchLinks": "Search links...",
+    "qrCodeFor": "QR Code for {{name}}",
+    "qrCode": "QR Code",
+    "regenerateQrCode": "Regenerate",
+    "downloadQrCode": "Download QR Code",
+    "generatingQrCode": "Generating QR code...",
+    "qrCodeCheckError": "Failed to check for existing QR code",
+    "qrCodeGenerateError": "Failed to generate QR code"
   },
   "stats": {
     "totalVisits": "Total Visits",
